@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
+use rayon::prelude::*;
 use std::collections::HashMap;
 
 use crate::game_transform::{game_transform_prob, game_transform_sim};
@@ -71,23 +72,26 @@ impl TournamentState {
         self.calculate_scores_internal(true, seed)
     }
 
-    /// Run multiple Monte Carlo simulations.
+    /// Run multiple Monte Carlo simulations in parallel.
     ///
     /// Returns a vector of score maps, one for each simulation.
+    /// Uses all available CPU cores for maximum throughput.
     #[pyo3(signature = (n_simulations, seed = None))]
     pub fn run_simulations(&self, n_simulations: usize, seed: Option<u64>) -> Vec<HashMap<String, f64>> {
-        let mut results = Vec::with_capacity(n_simulations);
-        let mut rng = match seed {
-            Some(s) => ChaCha8Rng::seed_from_u64(s),
-            None => ChaCha8Rng::from_entropy(),
+        // Generate seeds upfront (sequential for reproducibility)
+        let seeds: Vec<u64> = {
+            let mut rng = match seed {
+                Some(s) => ChaCha8Rng::seed_from_u64(s),
+                None => ChaCha8Rng::from_entropy(),
+            };
+            (0..n_simulations).map(|_| rng.gen::<u64>()).collect()
         };
 
-        for _ in 0..n_simulations {
-            let sim_seed = rng.gen::<u64>();
-            results.push(self.calculate_scores_internal(true, Some(sim_seed)));
-        }
-
-        results
+        // Run simulations in parallel
+        seeds
+            .par_iter()
+            .map(|&sim_seed| self.calculate_scores_internal(true, Some(sim_seed)))
+            .collect()
     }
 
     /// Get all teams in the bracket.
@@ -191,8 +195,6 @@ impl TournamentState {
         new_state
     }
 }
-
-use rand::Rng;
 
 #[cfg(test)]
 mod tests {

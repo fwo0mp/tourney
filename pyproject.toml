@@ -28,5 +28,6 @@ module-name = "tourney_core"
 
 [dependency-groups]
 dev = [
+    "maturin>=1.11.5",
     "pytest>=9.0.2",
 ]
