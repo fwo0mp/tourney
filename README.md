@@ -3,12 +3,21 @@ tourney
 
 Miscellaneous Scripts Related to the NCAA Tournament
 
+Installation
+------------
+
+This project uses [uv](https://github.com/astral-sh/uv) for package management.
+
+To install dependencies:
+
+    uv sync
+
 tourney\_scorer.py: Calculate expected scores for [casei](http://caseinsensitive.org) games
 ------------------
 
 Usage:
 
-    ./tourney_scorer.py bracket.txt [--overrides overrides.txt]
+    uv run tourney_scorer.py bracket.txt [--overrides overrides.txt]
 
 bracket.txt is a text file with a line for each team in the tournament consisting of 2 comma-separated fields.  The first field should be a string representing the team name and the second should be the [pythagorean expectation](http://en.wikipedia.org/wiki/Pythagorean_expectation) of that team.  For play-in games, include two such pairs separated by a comma.  The teams (or play-in pairs) should be listed in an order representing the bracket (as if it were flattened out instead of being split into two sides).
 
