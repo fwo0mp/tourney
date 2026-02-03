@@ -38,3 +38,10 @@ nosetests.xml
 tourney_env
 .env
 .venv
+
+# Rust build outputs
+target/
+Cargo.lock
+*.dylib
+*.dll
+*.pyd

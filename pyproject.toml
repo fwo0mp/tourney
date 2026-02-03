@@ -1,7 +1,7 @@
 [project]
 name = "tourney"
 version = "0.1.0"
-description = "Add your description here"
+description = "NCAA Tournament scoring and portfolio analysis"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -10,4 +10,23 @@ dependencies = [
     "python-dotenv>=1.2.1",
     "requests>=2.32.5",
     "scipy>=1.16.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[build-system]
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+manifest-path = "src/tourney_core/Cargo.toml"
+module-name = "tourney_core"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
 ]

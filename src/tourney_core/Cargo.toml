@@ -1,0 +1,25 @@
+[package]
+name = "tourney_core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "tourney_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.22", features = ["extension-module"] }
+statrs = "0.17"
+rayon = "1.10"
+rand = "0.8"
+rand_chacha = "0.3"
+
+[dev-dependencies]
+criterion = "0.5"
+proptest = "1.4"
+
+# Rust benchmarks disabled - use Python benchmarks instead (tests/test_performance.py)
+# The PyO3 bindings cause linking issues when running benchmarks outside Python
+# [[bench]]
+# name = "benchmark"
+# harness = false
