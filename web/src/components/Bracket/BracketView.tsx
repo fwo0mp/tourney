@@ -122,7 +122,6 @@ function RegionBracket({
   games,
   playInGames = [],
   teamInfoMap,
-  regionName,
   regionIndex,
   maxDelta,
   flipHorizontal = false,
@@ -131,7 +130,6 @@ function RegionBracket({
   games: BracketGame[];
   playInGames?: PlayInGame[];
   teamInfoMap: Map<string, TeamInfo>;
-  regionName: string;
   regionIndex: number;  // 0-3 for the four regions
   maxDelta: number;
   flipHorizontal?: boolean;
@@ -649,12 +647,7 @@ function RegionBracket({
   const topPadding = hasPlayIns ? 20 : 0;
   const height = 16 * (SLOT_HEIGHT + slotGap) + topPadding;
 
-  return (
-    <div>
-      <h3 className="text-sm font-semibold text-gray-700 mb-2">{regionName}</h3>
-      <svg ref={svgRef} width={width} height={height} />
-    </div>
-  );
+  return <svg ref={svgRef} width={width} height={height} />;
 }
 
 // Sweet 16 bracket showing the inner rounds (Sweet 16 through Championship)
@@ -1053,7 +1046,6 @@ export function BracketView() {
             games={regions[0].games}
             playInGames={regions[0].playInGames}
             teamInfoMap={teamInfoMap}
-            regionName={`Region 1 (${getFirstTeamName(regions[0].games)})`}
             regionIndex={0}
             maxDelta={maxDelta}
           />
@@ -1064,7 +1056,6 @@ export function BracketView() {
             games={regions[1].games}
             playInGames={regions[1].playInGames}
             teamInfoMap={teamInfoMap}
-            regionName={`Region 2 (${getFirstTeamName(regions[1].games)})`}
             regionIndex={1}
             maxDelta={maxDelta}
           />
@@ -1075,7 +1066,6 @@ export function BracketView() {
             games={regions[2].games}
             playInGames={regions[2].playInGames}
             teamInfoMap={teamInfoMap}
-            regionName={`Region 3 (${getFirstTeamName(regions[2].games)})`}
             regionIndex={2}
             maxDelta={maxDelta}
           />
@@ -1086,7 +1076,6 @@ export function BracketView() {
             games={regions[3].games}
             playInGames={regions[3].playInGames}
             teamInfoMap={teamInfoMap}
-            regionName={`Region 4 (${getFirstTeamName(regions[3].games)})`}
             regionIndex={3}
             maxDelta={maxDelta}
           />
@@ -1109,7 +1098,6 @@ export function BracketView() {
                 games={regions[0].games}
                 playInGames={regions[0].playInGames}
                 teamInfoMap={teamInfoMap}
-                regionName={`Region 1 (${getFirstTeamName(regions[0].games)})`}
                 regionIndex={0}
                 maxDelta={maxDelta}
                 compact
@@ -1118,7 +1106,6 @@ export function BracketView() {
                 games={regions[1].games}
                 playInGames={regions[1].playInGames}
                 teamInfoMap={teamInfoMap}
-                regionName={`Region 2 (${getFirstTeamName(regions[1].games)})`}
                 regionIndex={1}
                 maxDelta={maxDelta}
                 compact
@@ -1129,7 +1116,6 @@ export function BracketView() {
                 games={regions[2].games}
                 playInGames={regions[2].playInGames}
                 teamInfoMap={teamInfoMap}
-                regionName={`Region 3 (${getFirstTeamName(regions[2].games)})`}
                 regionIndex={2}
                 maxDelta={maxDelta}
                 flipHorizontal
@@ -1139,7 +1125,6 @@ export function BracketView() {
                 games={regions[3].games}
                 playInGames={regions[3].playInGames}
                 teamInfoMap={teamInfoMap}
-                regionName={`Region 4 (${getFirstTeamName(regions[3].games)})`}
                 regionIndex={3}
                 maxDelta={maxDelta}
                 flipHorizontal
