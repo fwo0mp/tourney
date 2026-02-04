@@ -110,3 +110,31 @@ export interface OrderbookResponse {
   is_mock: boolean;
   error?: string;
 }
+
+export interface SlotCandidate {
+  team: string;
+  probability: number;
+  portfolio_delta: number;
+}
+
+export interface SlotCandidatesResponse {
+  round: number;
+  position: number;
+  candidates: SlotCandidate[];
+}
+
+export interface ComputePathRequest {
+  team: string;
+  round: number;
+  position: number;
+  current_outcomes: WhatIfGameOutcome[];
+}
+
+export interface ComputePathResponse {
+  required_outcomes: WhatIfGameOutcome[];
+}
+
+export interface WhatIfState {
+  gameOutcomes: WhatIfGameOutcome[];
+  ratingAdjustments: Record<string, number>;
+}

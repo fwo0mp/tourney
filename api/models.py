@@ -127,3 +127,34 @@ class DeltasResponse(BaseModel):
 
     deltas: dict[str, float]
     pairwise: dict[str, dict[str, float]]
+
+
+class SlotCandidate(BaseModel):
+    """A candidate team for a bracket slot."""
+
+    team: str
+    probability: float
+    portfolio_delta: float
+
+
+class SlotCandidatesResponse(BaseModel):
+    """Response for slot candidates query."""
+
+    round: int
+    position: int
+    candidates: list[SlotCandidate]
+
+
+class ComputePathRequest(BaseModel):
+    """Request to compute path for team to reach a slot."""
+
+    team: str
+    round: int
+    position: int
+    current_outcomes: list[WhatIfGameOutcome] = []
+
+
+class ComputePathResponse(BaseModel):
+    """Response with required game outcomes for team to reach slot."""
+
+    required_outcomes: list[WhatIfGameOutcome]

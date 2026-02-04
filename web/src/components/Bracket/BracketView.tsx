@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import * as d3 from 'd3';
 import { useTeams, useBracket } from '../../hooks/useTournament';
 import { useUIStore } from '../../store/uiStore';
+import { MetaTeamModal } from './MetaTeamModal';
 import type { TeamInfo, BracketGame } from '../../types';
 
 type BracketViewType = 'overall' | 'region1' | 'region2' | 'region3' | 'region4' | 'sweet16';
@@ -48,10 +49,79 @@ function getDeltaColor(delta: number, maxDelta: number): string {
   }
 }
 
+// Build a map of which team is in each slot based on what-if outcomes
+function buildWhatIfSlotMap(
+  games: BracketGame[],
+  whatIfOutcomes: { winner: string; loser: string }[]
+): Map<string, string> {
+  // Map of "round-slotIndex" -> team name
+  const slotMap = new Map<string, string>();
+
+  if (whatIfOutcomes.length === 0) return slotMap;
+
+  // Create a map of winner -> teams they beat (their "path")
+  const winnerBeats = new Map<string, Set<string>>();
+  for (const outcome of whatIfOutcomes) {
+    if (!winnerBeats.has(outcome.winner)) {
+      winnerBeats.set(outcome.winner, new Set());
+    }
+    winnerBeats.get(outcome.winner)!.add(outcome.loser);
+  }
+
+  // Create team -> round 0 slot index map
+  const teamToR0Slot = new Map<string, number>();
+  games.forEach((game, i) => {
+    const teamNames = Object.keys(game.teams);
+    teamNames.forEach(name => teamToR0Slot.set(name, i));
+  });
+
+  // For each winner, trace their path through the bracket
+  for (const [winner, beatSet] of winnerBeats.entries()) {
+    const r0Slot = teamToR0Slot.get(winner);
+    if (r0Slot === undefined) continue;
+
+    // Check each round - calculate positions directly from R0 slot
+    for (let round = 1; round <= 4; round++) {
+      // Team's slot in the previous round (round - 1)
+      // At round R-1, team is at slot floor(r0Slot / 2^(R-1))
+      const teamSlotInPrevRound = Math.floor(r0Slot / Math.pow(2, round - 1));
+
+      // Opponent's slot in the previous round (XOR with 1 to get adjacent slot)
+      const opponentSlotInPrevRound = teamSlotInPrevRound ^ 1;
+
+      // Opponent could have come from any R0 slot in this range
+      // Slot S in round R-1 contains teams from R0 slots [S * 2^(R-1), (S+1) * 2^(R-1))
+      const opponentR0Start = opponentSlotInPrevRound * Math.pow(2, round - 1);
+      const opponentR0End = opponentR0Start + Math.pow(2, round - 1);
+
+      // Get all teams that could be in the opponent position
+      const opponentTeams: string[] = [];
+      for (let i = opponentR0Start; i < opponentR0End && i < games.length; i++) {
+        opponentTeams.push(...Object.keys(games[i]?.teams || {}));
+      }
+
+      // Check if this winner has beaten any of those teams
+      const hasBeatenOpponent = opponentTeams.some(t => beatSet.has(t));
+
+      if (hasBeatenOpponent) {
+        // Team's slot in this round (after winning)
+        const teamSlotInThisRound = Math.floor(r0Slot / Math.pow(2, round));
+        slotMap.set(`${round}-${teamSlotInThisRound}`, winner);
+      } else {
+        // No win recorded for this round, stop tracing
+        break;
+      }
+    }
+  }
+
+  return slotMap;
+}
+
 function RegionBracket({
   games,
   teamInfoMap,
   regionName,
+  regionIndex,
   maxDelta,
   flipHorizontal = false,
   compact = false,
@@ -59,6 +129,7 @@ function RegionBracket({
   games: BracketGame[];
   teamInfoMap: Map<string, TeamInfo>;
   regionName: string;
+  regionIndex: number;  // 0-3 for the four regions
   maxDelta: number;
   flipHorizontal?: boolean;
   compact?: boolean;  // Use smaller dimensions for overall view
@@ -68,6 +139,8 @@ function RegionBracket({
   const selectGame = useUIStore((state) => state.selectGame);
   const selectedTeam = useUIStore((state) => state.selectedTeam);
   const selectedGame = useUIStore((state) => state.selectedGame);
+  const openMetaTeamModal = useUIStore((state) => state.openMetaTeamModal);
+  const whatIf = useUIStore((state) => state.whatIf);
 
   useEffect(() => {
     if (!svgRef.current || games.length === 0) return;
@@ -82,6 +155,9 @@ function RegionBracket({
     const slotGap = compact ? COMPACT_SLOT_GAP : SLOT_GAP;
     const gameBoxPadding = GAME_BOX_PADDING;
 
+    // Compute which teams are in later round slots based on what-if outcomes
+    const whatIfSlotMap = buildWhatIfSlotMap(games, whatIf.gameOutcomes);
+
     // Build slots from games - each game has one team (or multiple for play-in)
     // For a 16-team region, we have 16 slots in round 0
     const slots: BracketSlot[] = [];
@@ -89,9 +165,10 @@ function RegionBracket({
 
     // Round 0: All 16 teams from the games
     games.forEach((game, i) => {
-      // Get the primary team name (first key in the teams dict)
-      const teamNames = Object.keys(game.teams);
-      const teamName = teamNames[0] || '';
+      // Get the team with highest probability (the "primary" team)
+      const teamEntries = Object.entries(game.teams);
+      teamEntries.sort((a, b) => b[1] - a[1]);
+      const teamName = teamEntries[0]?.[0] || '';
       const teamInfo = teamInfoMap.get(teamName) || null;
 
       const roundX = flipHorizontal
@@ -109,7 +186,7 @@ function RegionBracket({
       });
     });
 
-    // Add empty slots for later rounds
+    // Add slots for later rounds (may have determined teams from what-if)
     // Round 0: 16, Round 1: 8, Round 2: 4, Round 3: 2, Round 4: 1
     for (let round = 1; round < rounds; round++) {
       const slotsInRound = Math.pow(2, 4 - round);  // 8, 4, 2, 1
@@ -121,9 +198,14 @@ function RegionBracket({
           ? (rounds - 1 - round) * (slotWidth + roundGap)
           : round * (slotWidth + roundGap);
 
+        // Check if there's a what-if selected team for this slot
+        const slotKey = `${round}-${i}`;
+        const teamName = whatIfSlotMap.get(slotKey) || '';
+        const teamInfo = teamName ? teamInfoMap.get(teamName) || null : null;
+
         slots.push({
-          teamName: '',
-          teamInfo: null,
+          teamName,
+          teamInfo,
           x: roundX,
           y,
           round,
@@ -272,20 +354,90 @@ function RegionBracket({
         .text(slot.teamName.length > maxNameLen ? slot.teamName.substring(0, maxNameLen - 2) + '..' : slot.teamName);
     });
 
-    // Empty slots for later rounds
+    // Later round slots - may have determined teams or be empty/clickable
     slots.filter(s => s.round > 0).forEach((slot) => {
-      slotGroup.append('rect')
-        .attr('x', slot.x)
-        .attr('y', slot.y)
-        .attr('width', slotWidth)
-        .attr('height', slotHeight)
-        .attr('rx', 3)
-        .attr('fill', '#f9fafb')
-        .attr('stroke', '#e5e7eb')
-        .attr('stroke-width', 1);
+      // Calculate the global position for this slot
+      // Each region has 16 slots in round 0, then 8, 4, 2, 1
+      // The global position calculation depends on round and regionIndex
+      const slotsPerRegionRound0 = 16;
+      const globalRound = slot.round;
+      const slotsBeforeThisRegion = regionIndex * (slotsPerRegionRound0 / Math.pow(2, globalRound));
+      const globalPosition = Math.floor(slotsBeforeThisRegion + slot.slotIndex);
+
+      if (slot.teamName) {
+        // Slot has a determined team - render like round 0 slots
+        const group = slotGroup.append('g')
+          .attr('transform', `translate(${slot.x}, ${slot.y})`)
+          .attr('cursor', 'pointer')
+          .on('click', (event: MouseEvent) => {
+            event.stopPropagation();
+            // Still allow clicking to see other candidates or select a different team
+            openMetaTeamModal(globalRound, globalPosition);
+          });
+
+        const delta = slot.teamInfo?.delta || 0;
+
+        // Background rect with delta color
+        group.append('rect')
+          .attr('width', slotWidth)
+          .attr('height', slotHeight)
+          .attr('rx', 3)
+          .attr('fill', getDeltaColor(delta, maxDelta))
+          .attr('stroke', slot.teamName === selectedTeam ? '#3b82f6' : '#d1d5db')
+          .attr('stroke-width', slot.teamName === selectedTeam ? 2 : 1);
+
+        // Team name
+        const fontSize = compact ? '9px' : '10px';
+        const maxNameLen = compact ? 11 : 14;
+        group.append('text')
+          .attr('x', 4)
+          .attr('y', slotHeight / 2 + 4)
+          .attr('font-size', fontSize)
+          .attr('fill', '#374151')
+          .text(slot.teamName.length > maxNameLen ? slot.teamName.substring(0, maxNameLen - 2) + '..' : slot.teamName);
+
+        // Hover effect
+        group.on('mouseenter', function() {
+          d3.select(this).select('rect')
+            .attr('stroke', '#3b82f6')
+            .attr('stroke-width', 2);
+        }).on('mouseleave', function() {
+          d3.select(this).select('rect')
+            .attr('stroke', slot.teamName === selectedTeam ? '#3b82f6' : '#d1d5db')
+            .attr('stroke-width', slot.teamName === selectedTeam ? 2 : 1);
+        });
+      } else {
+        // Empty slot - clickable to open meta-team modal
+        const group = slotGroup.append('g')
+          .attr('transform', `translate(${slot.x}, ${slot.y})`)
+          .attr('cursor', 'pointer')
+          .on('click', (event: MouseEvent) => {
+            event.stopPropagation();
+            openMetaTeamModal(globalRound, globalPosition);
+          });
+
+        group.append('rect')
+          .attr('width', slotWidth)
+          .attr('height', slotHeight)
+          .attr('rx', 3)
+          .attr('fill', '#f9fafb')
+          .attr('stroke', '#9ca3af')
+          .attr('stroke-width', 1)
+          .attr('stroke-dasharray', '4,2');
+
+        group.on('mouseenter', function() {
+          d3.select(this).select('rect')
+            .attr('fill', '#f3f4f6')
+            .attr('stroke', '#6b7280');
+        }).on('mouseleave', function() {
+          d3.select(this).select('rect')
+            .attr('fill', '#f9fafb')
+            .attr('stroke', '#9ca3af');
+        });
+      }
     });
 
-  }, [games, teamInfoMap, maxDelta, flipHorizontal, compact, selectTeam, selectGame, selectedTeam, selectedGame]);
+  }, [games, teamInfoMap, maxDelta, flipHorizontal, compact, selectTeam, selectGame, selectedTeam, selectedGame, regionIndex, openMetaTeamModal, whatIf]);
 
   const slotWidth = compact ? COMPACT_SLOT_WIDTH : SLOT_WIDTH;
   const roundGap = compact ? COMPACT_ROUND_GAP : ROUND_GAP;
@@ -418,12 +570,6 @@ function Sweet16Bracket({
         lineGroup.append('line').attr('x1', midX).attr('y1', nextY).attr('x2', endX).attr('y2', nextY).attr('stroke', '#d1d5db');
       }
     });
-
-    // Left side Final Four connections
-    for (let ri = 0; ri < 2; ri++) {
-      const topRegionY = ri === 0 ? (slotHeight + slotGap) / 2 : regionHeight + regionGap + (slotHeight + slotGap) / 2;
-      const topY = ri === 0 ? (slotHeight + slotGap) * 0.5 + slotHeight / 2 : regionHeight + regionGap + (slotHeight + slotGap) * 0.5 + slotHeight / 2;
-    }
 
     // Right side connections (mirrored)
     rightRegions.forEach((_, ri) => {
@@ -611,6 +757,9 @@ export function BracketView() {
   const containerRef = useRef<HTMLDivElement>(null);
   const selectedTeam = useUIStore((state) => state.selectedTeam);
   const selectedGame = useUIStore((state) => state.selectedGame);
+  const metaTeamModal = useUIStore((state) => state.metaTeamModal);
+  const closeMetaTeamModal = useUIStore((state) => state.closeMetaTeamModal);
+  const whatIf = useUIStore((state) => state.whatIf);
 
   // Re-center bracket when sidebar opens/closes or view changes
   useLayoutEffect(() => {
@@ -686,6 +835,7 @@ export function BracketView() {
             games={regions[0].games}
             teamInfoMap={teamInfoMap}
             regionName={`Region 1 (${getFirstTeamName(regions[0].games)})`}
+            regionIndex={0}
             maxDelta={maxDelta}
           />
         );
@@ -695,6 +845,7 @@ export function BracketView() {
             games={regions[1].games}
             teamInfoMap={teamInfoMap}
             regionName={`Region 2 (${getFirstTeamName(regions[1].games)})`}
+            regionIndex={1}
             maxDelta={maxDelta}
           />
         );
@@ -704,6 +855,7 @@ export function BracketView() {
             games={regions[2].games}
             teamInfoMap={teamInfoMap}
             regionName={`Region 3 (${getFirstTeamName(regions[2].games)})`}
+            regionIndex={2}
             maxDelta={maxDelta}
           />
         );
@@ -713,6 +865,7 @@ export function BracketView() {
             games={regions[3].games}
             teamInfoMap={teamInfoMap}
             regionName={`Region 4 (${getFirstTeamName(regions[3].games)})`}
+            regionIndex={3}
             maxDelta={maxDelta}
           />
         );
@@ -734,6 +887,7 @@ export function BracketView() {
                 games={regions[0].games}
                 teamInfoMap={teamInfoMap}
                 regionName={`Region 1 (${getFirstTeamName(regions[0].games)})`}
+                regionIndex={0}
                 maxDelta={maxDelta}
                 compact
               />
@@ -741,6 +895,7 @@ export function BracketView() {
                 games={regions[1].games}
                 teamInfoMap={teamInfoMap}
                 regionName={`Region 2 (${getFirstTeamName(regions[1].games)})`}
+                regionIndex={1}
                 maxDelta={maxDelta}
                 compact
               />
@@ -750,6 +905,7 @@ export function BracketView() {
                 games={regions[2].games}
                 teamInfoMap={teamInfoMap}
                 regionName={`Region 3 (${getFirstTeamName(regions[2].games)})`}
+                regionIndex={2}
                 maxDelta={maxDelta}
                 flipHorizontal
                 compact
@@ -758,6 +914,7 @@ export function BracketView() {
                 games={regions[3].games}
                 teamInfoMap={teamInfoMap}
                 regionName={`Region 4 (${getFirstTeamName(regions[3].games)})`}
+                regionIndex={3}
                 maxDelta={maxDelta}
                 flipHorizontal
                 compact
@@ -767,6 +924,9 @@ export function BracketView() {
         );
     }
   };
+
+  // Check if any what-if scenarios are active
+  const hasWhatIfActive = whatIf.gameOutcomes.length > 0 || Object.keys(whatIf.ratingAdjustments).length > 0;
 
   return (
     <div ref={containerRef} className="bg-white rounded-lg shadow p-6 overflow-x-auto">
@@ -784,6 +944,11 @@ export function BracketView() {
               </option>
             ))}
           </select>
+          {hasWhatIfActive && (
+            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+              Scenario Active ({whatIf.gameOutcomes.length} game{whatIf.gameOutcomes.length !== 1 ? 's' : ''})
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-4 text-xs">
           <div className="flex items-center gap-1">
@@ -802,6 +967,14 @@ export function BracketView() {
       </div>
 
       {renderBracketContent()}
+
+      {metaTeamModal && (
+        <MetaTeamModal
+          round={metaTeamModal.round}
+          position={metaTeamModal.position}
+          onClose={closeMetaTeamModal}
+        />
+      )}
     </div>
   );
 }

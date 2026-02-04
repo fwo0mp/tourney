@@ -241,3 +241,63 @@ class PortfolioService:
 def get_portfolio_service() -> PortfolioService:
     """Dependency injection for portfolio service."""
     return PortfolioService.get_instance()
+
+
+def get_slot_candidates_with_deltas(
+    portfolio_service: PortfolioService,
+    state,
+    target_round: int,
+    target_position: int,
+) -> list[dict]:
+    """Get all teams that can reach a slot with their probabilities and portfolio deltas.
+
+    Args:
+        portfolio_service: The portfolio service instance
+        state: The tournament state (possibly with what-if modifications applied)
+        target_round: The round number (0 = first round, 1 = second round, etc.)
+        target_position: The position within the round
+
+    Returns a list of dicts with keys: team, probability, portfolio_delta
+    """
+    from api.services.tournament_service import (
+        get_slot_teams,
+        compute_path_to_slot,
+        apply_what_if,
+    )
+
+    positions, _ = portfolio_service.get_positions()
+
+    # Get current portfolio value
+    current_scores = state.calculate_scores_prob()
+    current_value = pv.get_portfolio_value(positions, current_scores)
+
+    # Get teams that can reach this slot
+    slot_teams = get_slot_teams(state, target_round, target_position)
+
+    candidates = []
+    for team, probability in slot_teams.items():
+        if probability < 0.001:  # Skip negligible probabilities
+            continue
+
+        # Compute path for this team to reach the slot
+        path = compute_path_to_slot(state, team, target_round, target_position)
+
+        if path:
+            # Apply overrides and compute new value
+            game_outcomes = [{"winner": w, "loser": l} for w, l in path]
+            modified_state = apply_what_if(state, game_outcomes=game_outcomes)
+            modified_scores = modified_state.calculate_scores_prob()
+            modified_value = pv.get_portfolio_value(positions, modified_scores)
+            portfolio_delta = modified_value - current_value
+        else:
+            portfolio_delta = 0.0
+
+        candidates.append({
+            "team": team,
+            "probability": probability,
+            "portfolio_delta": portfolio_delta,
+        })
+
+    # Sort by probability descending
+    candidates.sort(key=lambda c: c["probability"], reverse=True)
+    return candidates

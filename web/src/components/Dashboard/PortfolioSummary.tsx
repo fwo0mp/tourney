@@ -1,7 +1,15 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { usePortfolioDistribution, usePositions } from '../../hooks/usePortfolio';
+import { useUIStore } from '../../store/uiStore';
 import type { PortfolioSummary as PortfolioSummaryType } from '../../types';
+
+const SIMULATION_OPTIONS = [
+  { value: 1000, label: '1,000' },
+  { value: 10000, label: '10,000' },
+  { value: 50000, label: '50,000' },
+  { value: 100000, label: '100,000' },
+];
 
 const CHART_HEIGHT = 200;
 const CHART_MARGIN = { top: 20, right: 20, bottom: 30, left: 50 };
@@ -126,8 +134,23 @@ function DistributionChart({ distribution }: { distribution: PortfolioSummaryTyp
 }
 
 export function PortfolioSummary() {
+  const [nSimulations, setNSimulations] = useState(10000);
   const { data: positions, isLoading: posLoading } = usePositions();
-  const { data: distribution, isLoading: distLoading } = usePortfolioDistribution(100000);
+  const { data: distribution, isLoading: distLoading, refetch } = usePortfolioDistribution(nSimulations);
+  const monteCarloStale = useUIStore((state) => state.monteCarloStale);
+  const clearMonteCarloStale = useUIStore((state) => state.clearMonteCarloStale);
+  const whatIf = useUIStore((state) => state.whatIf);
+
+  const hasWhatIfActive = whatIf.gameOutcomes.length > 0 || Object.keys(whatIf.ratingAdjustments).length > 0;
+
+  const handleResimulate = async () => {
+    await refetch();
+    clearMonteCarloStale();
+  };
+
+  const handleSimulationsChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setNSimulations(Number(e.target.value));
+  };
 
   if (posLoading || distLoading) {
     return (
@@ -157,12 +180,34 @@ export function PortfolioSummary() {
     <div className="bg-white rounded-lg shadow p-6 h-[500px] flex flex-col">
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <h2 className="text-lg font-semibold text-gray-900">Portfolio Summary</h2>
-        {positions?.is_mock && (
-          <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-            Mock Data
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {hasWhatIfActive && (
+            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+              Scenario Active
+            </span>
+          )}
+          {positions?.is_mock && (
+            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+              Mock Data
+            </span>
+          )}
+        </div>
       </div>
+
+      {monteCarloStale && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
+          <span className="text-sm text-amber-800">
+            Distribution may be outdated due to scenario changes.
+          </span>
+          <button
+            onClick={handleResimulate}
+            disabled={distLoading}
+            className="px-3 py-1 text-sm font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 rounded disabled:opacity-50"
+          >
+            {distLoading ? 'Simulating...' : 'Re-simulate'}
+          </button>
+        </div>
+      )}
 
       <div className="flex-1 flex flex-col space-y-4 overflow-hidden">
         {/* Expected Value */}
@@ -204,10 +249,27 @@ export function PortfolioSummary() {
           </div>
         </div>
 
-        {/* Min/Max */}
-        <div className="flex-shrink-0 flex justify-between text-xs text-gray-500">
-          <span>Min: {formatValue(distribution.min_value)}</span>
-          <span>Max: {formatValue(distribution.max_value)}</span>
+        {/* Min/Max and Simulation Settings */}
+        <div className="flex-shrink-0 flex justify-between items-center text-xs text-gray-500">
+          <div className="flex gap-4">
+            <span>Min: {formatValue(distribution.min_value)}</span>
+            <span>Max: {formatValue(distribution.max_value)}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <label htmlFor="simulations" className="text-gray-600">Simulations:</label>
+            <select
+              id="simulations"
+              value={nSimulations}
+              onChange={handleSimulationsChange}
+              className="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              {SIMULATION_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
     </div>

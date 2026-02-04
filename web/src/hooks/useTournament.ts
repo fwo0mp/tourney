@@ -1,11 +1,22 @@
 import { useQuery } from '@tanstack/react-query';
 import { tournamentApi } from '../api/tournament';
 import { analysisApi } from '../api/analysis';
+import { useUIStore } from '../store/uiStore';
+import type { WhatIfState } from '../types';
+
+// Helper to create a stable key from whatIf state
+function whatIfKey(whatIf: WhatIfState): string {
+  if (whatIf.gameOutcomes.length === 0 && Object.keys(whatIf.ratingAdjustments).length === 0) {
+    return 'base';
+  }
+  return JSON.stringify(whatIf);
+}
 
 export function useTeams() {
+  const whatIf = useUIStore((state) => state.whatIf);
   return useQuery({
-    queryKey: ['tournament', 'teams'],
-    queryFn: tournamentApi.getTeams,
+    queryKey: ['tournament', 'teams', whatIfKey(whatIf)],
+    queryFn: () => tournamentApi.getTeams(whatIf),
     staleTime: 5 * 60_000,
   });
 }
@@ -20,9 +31,10 @@ export function useTeam(name: string) {
 }
 
 export function useBracket() {
+  const whatIf = useUIStore((state) => state.whatIf);
   return useQuery({
-    queryKey: ['tournament', 'bracket'],
-    queryFn: tournamentApi.getBracket,
+    queryKey: ['tournament', 'bracket', whatIfKey(whatIf)],
+    queryFn: () => tournamentApi.getBracket(whatIf),
     staleTime: 5 * 60_000,
   });
 }
@@ -32,6 +44,16 @@ export function useGameImpact(team1: string | null, team2: string | null) {
     queryKey: ['analysis', 'game', team1, team2],
     queryFn: () => analysisApi.getGameImpact(team1!, team2!),
     enabled: !!team1 && !!team2,
+    staleTime: 60_000,
+  });
+}
+
+export function useSlotCandidates(round: number | null, position: number | null) {
+  const whatIf = useUIStore((state) => state.whatIf);
+  return useQuery({
+    queryKey: ['analysis', 'slot-candidates', round, position, whatIfKey(whatIf)],
+    queryFn: () => analysisApi.getSlotCandidates(round!, position!, whatIf),
+    enabled: round !== null && position !== null && round >= 0 && position >= 0,
     staleTime: 60_000,
   });
 }

@@ -185,3 +185,145 @@ class TournamentService:
 def get_tournament_service() -> TournamentService:
     """Dependency injection for tournament service."""
     return TournamentService.get_instance()
+
+
+def apply_what_if(
+    state: tourney.TournamentState,
+    game_outcomes: list = None,
+    rating_adjustments: dict = None,
+) -> tourney.TournamentState:
+    """Apply what-if modifications to a tournament state."""
+    modified_state = state
+    if game_outcomes:
+        for outcome in game_outcomes:
+            modified_state = modified_state.with_override(
+                outcome.get("winner") or outcome.winner,
+                outcome.get("loser") or outcome.loser,
+                1.0,
+            )
+    if rating_adjustments:
+        for team_name, delta in rating_adjustments.items():
+            modified_state = modified_state.with_team_adjustment(team_name, delta)
+    return modified_state
+
+
+def compute_bracket_rounds(state: tourney.TournamentState) -> list[list[dict]]:
+    """Compute all rounds of the bracket with team probabilities.
+
+    Returns a list of rounds, where each round is a list of slots.
+    Each slot is a dict of team -> probability.
+    """
+    bracket = state.bracket  # Round 0 games
+    rounds = [list(bracket)]  # Start with round 0
+
+    current_round = list(bracket)
+    while len(current_round) > 1:
+        next_round = []
+        # Pair up games and compute winners
+        for i in range(0, len(current_round), 2):
+            game1 = current_round[i]
+            game2 = current_round[i + 1]
+
+            # Compute probability each team reaches this slot
+            winner_probs = {}
+            for team1, prob1 in game1.items():
+                for team2, prob2 in game2.items():
+                    # Get win probability
+                    t1 = state.ratings.get(team1)
+                    t2 = state.ratings.get(team2)
+                    if t1 and t2:
+                        win_prob = tourney.calculate_win_prob(
+                            t1, t2, state.overrides, state.forfeit_prob
+                        )
+                        # Probability team1 reaches and wins
+                        p1_wins = prob1 * prob2 * win_prob
+                        # Probability team2 reaches and wins
+                        p2_wins = prob1 * prob2 * (1 - win_prob)
+
+                        winner_probs[team1] = winner_probs.get(team1, 0) + p1_wins
+                        winner_probs[team2] = winner_probs.get(team2, 0) + p2_wins
+
+            next_round.append(winner_probs)
+
+        rounds.append(next_round)
+        current_round = next_round
+
+    return rounds
+
+
+def get_slot_teams(state: tourney.TournamentState, target_round: int, position: int) -> dict:
+    """Get teams that can reach a specific slot with their probabilities."""
+    rounds = compute_bracket_rounds(state)
+
+    if target_round >= len(rounds):
+        return {}
+
+    round_slots = rounds[target_round]
+    if position >= len(round_slots):
+        return {}
+
+    return round_slots[position]
+
+
+def compute_path_to_slot(
+    state: tourney.TournamentState,
+    team: str,
+    target_round: int,
+    target_position: int,
+) -> list[tuple[str, str]]:
+    """Compute the game outcomes (winner, loser) needed for team to reach slot.
+
+    Returns a list of (winner, loser) tuples for all games the team must win.
+    The team must beat ALL possible opponents they could face, not just the most likely.
+    """
+    # Find team's starting position in round 0
+    bracket = state.bracket
+    start_pos = None
+    for i, game in enumerate(bracket):
+        if team in game:
+            start_pos = i
+            break
+
+    if start_pos is None:
+        return []  # Team not in bracket
+
+    outcomes = []
+    current_pos = start_pos
+    rounds = compute_bracket_rounds(state)
+
+    for round_num in range(target_round):
+        if round_num >= len(rounds):
+            break
+
+        round_slots = rounds[round_num]
+
+        # Find the slot in this round where our team could be
+        if current_pos >= len(round_slots):
+            break
+
+        slot = round_slots[current_pos]
+        if team not in slot:
+            break  # Team can't reach this point
+
+        # Find the opposing slot
+        if current_pos % 2 == 0:
+            opponent_pos = current_pos + 1
+        else:
+            opponent_pos = current_pos - 1
+
+        if opponent_pos >= len(round_slots):
+            break
+
+        opponent_slot = round_slots[opponent_pos]
+
+        # The team must beat ALL possible opponents from the opposing slot
+        # Add an override for each potential opponent
+        if opponent_slot:
+            for opponent in opponent_slot.keys():
+                if opponent != team:  # Don't add self as opponent
+                    outcomes.append((team, opponent))
+
+        # Update position for next round (positions halve each round)
+        current_pos = current_pos // 2
+
+    return outcomes
