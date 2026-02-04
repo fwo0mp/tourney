@@ -170,9 +170,18 @@ class PortfolioService:
         tournament = get_tournament_service()
         state = tournament.get_state()
 
+        # Get current expected portfolio value
+        current_scores = state.calculate_scores_prob()
+        current_value = pv.get_portfolio_value(positions, current_scores)
+
+        # Get portfolio values for each outcome
         win_value, loss_value, team_impacts = pv.game_delta(
             positions, state, team1, team2
         )
+
+        # Calculate deltas from current expected value
+        win_delta = win_value - current_value
+        loss_delta = loss_value - current_value
 
         win_prob = tournament.calculate_win_prob(team1, team2)
 
@@ -180,9 +189,9 @@ class PortfolioService:
             "team1": team1,
             "team2": team2,
             "win_prob": win_prob,
-            "if_team1_wins": win_value,
-            "if_team2_wins": loss_value,
-            "swing": abs(win_value - loss_value),
+            "if_team1_wins": win_delta,
+            "if_team2_wins": loss_delta,
+            "swing": abs(win_delta - loss_delta),
             "team_impacts": [
                 {
                     "team": td.team,
