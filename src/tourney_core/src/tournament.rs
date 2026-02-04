@@ -126,6 +126,22 @@ impl TournamentState {
             self.scoring.len()
         )
     }
+
+    /// Create a modified copy with an override added
+    pub fn with_override(&self, team1: &str, team2: &str, prob: f64) -> Self {
+        let mut new_state = self.clone();
+        new_state.overrides.add_override(team1, team2, prob);
+        new_state
+    }
+
+    /// Create a modified copy with a team's rating adjusted
+    pub fn with_team_adjustment(&self, team_name: &str, point_delta: f64) -> Self {
+        let mut new_state = self.clone();
+        if let Some(team) = new_state.ratings.get_mut(team_name) {
+            *team = team.with_adjustment(point_delta);
+        }
+        new_state
+    }
 }
 
 impl TournamentState {
@@ -177,22 +193,6 @@ impl TournamentState {
         }
 
         total_scores
-    }
-
-    /// Create a modified copy with an override added
-    pub fn with_override(&self, team1: &str, team2: &str, prob: f64) -> Self {
-        let mut new_state = self.clone();
-        new_state.overrides.add_override(team1, team2, prob);
-        new_state
-    }
-
-    /// Create a modified copy with a team's rating adjusted
-    pub fn with_team_adjustment(&self, team_name: &str, point_delta: f64) -> Self {
-        let mut new_state = self.clone();
-        if let Some(team) = new_state.ratings.get_mut(team_name) {
-            *team = team.with_adjustment(point_delta);
-        }
-        new_state
     }
 }
 

@@ -1,0 +1,105 @@
+export interface TeamInfo {
+  name: string;
+  offense: number;
+  defense: number;
+  tempo: number;
+  seed: number | null;
+  expected_score: number;
+  position: number;
+  delta: number;
+}
+
+export interface PortfolioSummary {
+  expected_value: number;
+  min_value: number;
+  max_value: number;
+  p1: number;
+  p5: number;
+  p10: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p90: number;
+  p95: number;
+  p99: number;
+}
+
+export interface GameImpact {
+  team1: string;
+  team2: string;
+  win_prob: number;
+  if_team1_wins: number;
+  if_team2_wins: number;
+  swing: number;
+}
+
+export interface TeamDeltaInfo {
+  team: string;
+  position: number;
+  delta_per_share: number;
+  total_delta: number;
+}
+
+export interface GameDeltaResponse {
+  team1: string;
+  team2: string;
+  win_prob: number;
+  if_team1_wins: number;
+  if_team2_wins: number;
+  swing: number;
+  team_impacts: TeamDeltaInfo[];
+}
+
+export interface BracketGame {
+  id: string;
+  round: number;
+  region: string | null;
+  teams: Record<string, number>;
+}
+
+export interface BracketResponse {
+  games: BracketGame[];
+  num_teams: number;
+  num_rounds: number;
+}
+
+export interface PositionsResponse {
+  positions: Record<string, number>;
+  is_mock: boolean;
+}
+
+export interface DeltasResponse {
+  deltas: Record<string, number>;
+  pairwise: Record<string, Record<string, number>>;
+}
+
+export interface WhatIfGameOutcome {
+  winner: string;
+  loser: string;
+}
+
+export interface WhatIfRequest {
+  game_outcomes: WhatIfGameOutcome[];
+  rating_adjustments: Record<string, number>;
+}
+
+export interface WhatIfResponse {
+  original_value: number;
+  modified_value: number;
+  delta: number;
+  original_scores: Record<string, number>;
+  modified_scores: Record<string, number>;
+}
+
+export interface OrderbookLevel {
+  price: number;
+  size: number;
+}
+
+export interface OrderbookResponse {
+  team: string;
+  bids: OrderbookLevel[];
+  asks: OrderbookLevel[];
+  is_mock: boolean;
+  error?: string;
+}

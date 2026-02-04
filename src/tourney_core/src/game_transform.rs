@@ -43,14 +43,36 @@ pub fn game_transform_prob(
     parent
 }
 
+/// Resolve a multi-team game to a single winner via simulation.
+///
+/// If the game has multiple teams (play-in), picks a winner weighted by probability.
+/// If the game has one team, returns that team's name.
+fn resolve_game_to_winner<R: Rng>(game: &HashMap<String, f64>, rng: &mut R) -> String {
+    if game.len() == 1 {
+        return game.keys().next().unwrap().clone();
+    }
+
+    // Multiple teams - pick weighted by probability
+    let r: f64 = rng.gen();
+    let mut cumulative = 0.0;
+    for (name, &prob) in game.iter() {
+        cumulative += prob;
+        if r < cumulative {
+            return name.clone();
+        }
+    }
+    // Fallback to last team (shouldn't happen if probabilities sum to 1)
+    game.keys().last().unwrap().clone()
+}
+
 /// Monte Carlo game simulation.
 ///
-/// Given two child game states (each with exactly one team),
+/// Given two child game states (may have multiple teams for play-in games),
 /// simulates the game outcome.
 ///
 /// # Arguments
-/// * `child1` - First game's winner
-/// * `child2` - Second game's winner
+/// * `child1` - First game's outcome distribution
+/// * `child2` - Second game's outcome distribution
 /// * `teams` - Map of team names to Team objects
 /// * `overrides` - Optional probability overrides
 /// * `forfeit_prob` - Probability of forfeit
@@ -65,13 +87,12 @@ pub fn game_transform_sim<R: Rng>(
     forfeit_prob: f64,
     rng: &mut R,
 ) -> HashMap<String, f64> {
-    assert!(child1.len() == 1 && child2.len() == 1);
+    // Resolve any play-in games first
+    let name1 = resolve_game_to_winner(child1, rng);
+    let name2 = resolve_game_to_winner(child2, rng);
 
-    let name1 = child1.keys().next().unwrap();
-    let name2 = child2.keys().next().unwrap();
-
-    let team1 = &teams[name1];
-    let team2 = &teams[name2];
+    let team1 = &teams[&name1];
+    let team2 = &teams[&name2];
 
     // Simulate forfeits
     let team1_forfeit = rng.gen::<f64>() < forfeit_prob;
@@ -83,11 +104,11 @@ pub fn game_transform_sim<R: Rng>(
         return HashMap::new();
     } else if team1_forfeit {
         let mut result = HashMap::new();
-        result.insert(name2.clone(), 1.0);
+        result.insert(name2, 1.0);
         return result;
     } else if team2_forfeit {
         let mut result = HashMap::new();
-        result.insert(name1.clone(), 1.0);
+        result.insert(name1, 1.0);
         return result;
     }
 
@@ -96,7 +117,7 @@ pub fn game_transform_sim<R: Rng>(
     let winner = if rng.gen::<f64>() < prob { name1 } else { name2 };
 
     let mut result = HashMap::new();
-    result.insert(winner.clone(), 1.0);
+    result.insert(winner, 1.0);
     result
 }
 

@@ -45,3 +45,10 @@ Cargo.lock
 *.dylib
 *.dll
 *.pyd
+
+# Frontend build outputs
+web/node_modules/
+web/dist/
+web/.vite/
+web/*.local
+web/.tsbuildinfo

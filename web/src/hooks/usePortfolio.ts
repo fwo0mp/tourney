@@ -1,0 +1,45 @@
+import { useQuery } from '@tanstack/react-query';
+import { portfolioApi } from '../api/portfolio';
+
+export function usePositions() {
+  return useQuery({
+    queryKey: ['portfolio', 'positions'],
+    queryFn: portfolioApi.getPositions,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+}
+
+export function usePortfolioValue() {
+  return useQuery({
+    queryKey: ['portfolio', 'value'],
+    queryFn: portfolioApi.getValue,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+}
+
+export function usePortfolioDistribution(nSimulations = 10000) {
+  return useQuery({
+    queryKey: ['portfolio', 'distribution', nSimulations],
+    queryFn: () => portfolioApi.getDistribution(nSimulations),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useDeltas(pointDelta = 1.0) {
+  return useQuery({
+    queryKey: ['portfolio', 'deltas', pointDelta],
+    queryFn: () => portfolioApi.getDeltas(pointDelta),
+    staleTime: 60_000,
+  });
+}
+
+export function useTeamImpact(teamName: string | null, pointDelta = 1.0) {
+  return useQuery({
+    queryKey: ['portfolio', 'team-impact', teamName, pointDelta],
+    queryFn: () => portfolioApi.getTeamImpact(teamName!, pointDelta),
+    enabled: !!teamName,
+    staleTime: 60_000,
+  });
+}
