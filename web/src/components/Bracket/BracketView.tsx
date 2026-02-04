@@ -1,8 +1,8 @@
 import { useEffect, useRef, useLayoutEffect } from 'react';
 import * as d3 from 'd3';
-import { useTeams } from '../../hooks/useTournament';
+import { useTeams, useBracket } from '../../hooks/useTournament';
 import { useUIStore } from '../../store/uiStore';
-import type { TeamInfo } from '../../types';
+import type { TeamInfo, BracketGame } from '../../types';
 
 const SLOT_WIDTH = 120;
 const SLOT_HEIGHT = 24;
@@ -11,47 +11,44 @@ const SLOT_GAP = 8;
 const GAME_BOX_PADDING = 6;
 
 interface BracketSlot {
-  team: TeamInfo | null;
+  teamName: string;
+  teamInfo: TeamInfo | null;
   x: number;
   y: number;
   round: number;
-  region: string;
   slotIndex: number;
 }
 
-function getRegionTeams(teams: TeamInfo[], regionIndex: number): TeamInfo[] {
-  // Sort teams by expected score (descending) as proxy for seed
-  const sorted = [...teams].sort((a, b) => b.expected_score - a.expected_score);
-  // Split into 4 regions of 16 teams each
-  const start = regionIndex * 16;
-  return sorted.slice(start, start + 16);
-}
-
 function getDeltaColor(delta: number, maxDelta: number): string {
+  // Color based on portfolio delta (sensitivity to team's rating change)
   if (delta === 0 || maxDelta === 0) return '#e5e7eb'; // gray-200
   const intensity = Math.min(Math.abs(delta) / maxDelta, 1);
+  // Start from neutral gray (229) and interpolate toward green or red
+  const neutral = 229; // gray-200
   if (delta > 0) {
-    // Green gradient
-    const g = Math.round(180 + intensity * 75);
-    const r = Math.round(220 - intensity * 180);
-    const b = Math.round(220 - intensity * 180);
+    // Green gradient for positive delta (portfolio benefits from team improvement)
+    const r = Math.round(neutral - intensity * 189); // 229 -> 40
+    const g = Math.round(neutral + intensity * 26);  // 229 -> 255
+    const b = Math.round(neutral - intensity * 189); // 229 -> 40
     return `rgb(${r}, ${g}, ${b})`;
   } else {
-    // Red gradient
-    const r = Math.round(180 + intensity * 75);
-    const g = Math.round(220 - intensity * 180);
-    const b = Math.round(220 - intensity * 180);
+    // Red gradient for negative delta (portfolio hurt by team improvement)
+    const r = Math.round(neutral + intensity * 26);  // 229 -> 255
+    const g = Math.round(neutral - intensity * 189); // 229 -> 40
+    const b = Math.round(neutral - intensity * 189); // 229 -> 40
     return `rgb(${r}, ${g}, ${b})`;
   }
 }
 
 function RegionBracket({
-  teams,
+  games,
+  teamInfoMap,
   regionName,
   maxDelta,
   flipHorizontal = false,
 }: {
-  teams: TeamInfo[];
+  games: BracketGame[];
+  teamInfoMap: Map<string, TeamInfo>;
   regionName: string;
   maxDelta: number;
   flipHorizontal?: boolean;
@@ -63,62 +60,77 @@ function RegionBracket({
   const selectedGame = useUIStore((state) => state.selectedGame);
 
   useEffect(() => {
-    if (!svgRef.current || teams.length === 0) return;
+    if (!svgRef.current || games.length === 0) return;
 
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
 
-    // Calculate positions for 16-team single-elimination bracket
-    // Round 1: 8 games (16 teams)
-    // Round 2: 4 games (8 teams)
-    // Round 3: 2 games (4 teams)
-    // Round 4: 1 game (2 teams) - Sweet 16 winner
-    const rounds = 4;
+    // Build slots from games - each game has one team (or multiple for play-in)
+    // For a 16-team region, we have 16 slots in round 0
     const slots: BracketSlot[] = [];
+    const rounds = 4; // 16 -> 8 -> 4 -> 2
 
-    // Standard bracket seed order: 1v16, 8v9, 5v12, 4v13, 6v11, 3v14, 7v10, 2v15
-    const seedOrder = [0, 15, 7, 8, 4, 11, 3, 12, 5, 10, 2, 13, 6, 9, 1, 14];
+    // Round 0: All 16 teams from the games
+    games.forEach((game, i) => {
+      // Get the primary team name (first key in the teams dict)
+      const teamNames = Object.keys(game.teams);
+      const teamName = teamNames[0] || '';
+      const teamInfo = teamInfoMap.get(teamName) || null;
 
-    // Build slot positions
-    for (let round = 0; round < rounds; round++) {
-      const gamesInRound = Math.pow(2, rounds - 1 - round);
-      const teamsInRound = gamesInRound * 2;
       const roundX = flipHorizontal
-        ? (rounds - 1 - round) * (SLOT_WIDTH + ROUND_GAP)
-        : round * (SLOT_WIDTH + ROUND_GAP);
+        ? (rounds - 1) * (SLOT_WIDTH + ROUND_GAP)
+        : 0;
+      const y = i * (SLOT_HEIGHT + SLOT_GAP);
 
-      for (let i = 0; i < teamsInRound; i++) {
+      slots.push({
+        teamName,
+        teamInfo,
+        x: roundX,
+        y,
+        round: 0,
+        slotIndex: i,
+      });
+    });
+
+    // Add empty slots for later rounds
+    for (let round = 1; round < rounds; round++) {
+      const slotsInRound = Math.pow(2, rounds - 1 - round);
+      for (let i = 0; i < slotsInRound; i++) {
         const spacing = Math.pow(2, round) * (SLOT_HEIGHT + SLOT_GAP);
         const offset = (Math.pow(2, round) - 1) * (SLOT_HEIGHT + SLOT_GAP) / 2;
         const y = offset + i * spacing;
+        const roundX = flipHorizontal
+          ? (rounds - 1 - round) * (SLOT_WIDTH + ROUND_GAP)
+          : round * (SLOT_WIDTH + ROUND_GAP);
 
-        let team: TeamInfo | null = null;
-        if (round === 0) {
-          team = teams[seedOrder[i]] || null;
-        }
-
-        slots.push({ team, x: roundX, y, round, region: regionName, slotIndex: i });
+        slots.push({
+          teamName: '',
+          teamInfo: null,
+          x: roundX,
+          y,
+          round,
+          slotIndex: i,
+        });
       }
     }
 
-    // Draw game boxes first (lower z-index)
+    // Draw game boxes first (lower z-index) - for round 0 matchups
     const gameBoxGroup = svg.append('g').attr('class', 'game-boxes');
 
-    // Only draw game boxes for round 0 (first round games with known teams)
-    const round0Slots = slots.filter(s => s.round === 0 && s.team);
-    for (let game = 0; game < 8; game++) {
-      const topSlot = round0Slots[game * 2];
-      const bottomSlot = round0Slots[game * 2 + 1];
+    const round0Slots = slots.filter(s => s.round === 0);
+    for (let matchup = 0; matchup < 8; matchup++) {
+      const topSlot = round0Slots[matchup * 2];
+      const bottomSlot = round0Slots[matchup * 2 + 1];
 
-      if (topSlot?.team && bottomSlot?.team) {
-        const boxX = topSlot.x - GAME_BOX_PADDING;
+      if (topSlot && bottomSlot && topSlot.teamName && bottomSlot.teamName) {
+        const boxX = Math.min(topSlot.x, bottomSlot.x) - GAME_BOX_PADDING;
         const boxY = topSlot.y - GAME_BOX_PADDING;
         const boxWidth = SLOT_WIDTH + GAME_BOX_PADDING * 2;
         const boxHeight = (bottomSlot.y + SLOT_HEIGHT) - topSlot.y + GAME_BOX_PADDING * 2;
 
         const isSelected = selectedGame &&
-          ((selectedGame.team1 === topSlot.team.name && selectedGame.team2 === bottomSlot.team.name) ||
-           (selectedGame.team1 === bottomSlot.team.name && selectedGame.team2 === topSlot.team.name));
+          ((selectedGame.team1 === topSlot.teamName && selectedGame.team2 === bottomSlot.teamName) ||
+           (selectedGame.team1 === bottomSlot.teamName && selectedGame.team2 === topSlot.teamName));
 
         gameBoxGroup.append('rect')
           .attr('x', boxX)
@@ -133,7 +145,7 @@ function RegionBracket({
           .attr('cursor', 'pointer')
           .on('click', (event: MouseEvent) => {
             event.stopPropagation();
-            selectGame({ team1: topSlot.team!.name, team2: bottomSlot.team!.name });
+            selectGame({ team1: topSlot.teamName, team2: bottomSlot.teamName });
           })
           .on('mouseenter', function() {
             d3.select(this)
@@ -142,8 +154,8 @@ function RegionBracket({
           })
           .on('mouseleave', function() {
             const stillSelected = selectedGame &&
-              ((selectedGame.team1 === topSlot.team!.name && selectedGame.team2 === bottomSlot.team!.name) ||
-               (selectedGame.team1 === bottomSlot.team!.name && selectedGame.team2 === topSlot.team!.name));
+              ((selectedGame.team1 === topSlot.teamName && selectedGame.team2 === bottomSlot.teamName) ||
+               (selectedGame.team1 === bottomSlot.teamName && selectedGame.team2 === topSlot.teamName));
             d3.select(this)
               .attr('fill', stillSelected ? 'rgba(59, 130, 246, 0.1)' : 'transparent')
               .attr('stroke', stillSelected ? '#3b82f6' : '#e5e7eb');
@@ -155,20 +167,15 @@ function RegionBracket({
     const lineGroup = svg.append('g').attr('class', 'lines');
 
     for (let round = 0; round < rounds - 1; round++) {
-      const gamesInRound = Math.pow(2, rounds - 1 - round);
-      for (let game = 0; game < gamesInRound; game++) {
-        const topSlotIdx = slots.findIndex(s => s.round === round &&
-          s.y === slots.filter(s2 => s2.round === round)[game * 2]?.y);
-        const bottomSlotIdx = slots.findIndex(s => s.round === round &&
-          s.y === slots.filter(s2 => s2.round === round)[game * 2 + 1]?.y);
-        const nextSlotIdx = slots.findIndex(s => s.round === round + 1 &&
-          s.y === slots.filter(s2 => s2.round === round + 1)[game]?.y);
+      const roundSlots = slots.filter(s => s.round === round);
+      const nextRoundSlots = slots.filter(s => s.round === round + 1);
 
-        if (topSlotIdx >= 0 && bottomSlotIdx >= 0 && nextSlotIdx >= 0) {
-          const topSlot = slots[topSlotIdx];
-          const bottomSlot = slots[bottomSlotIdx];
-          const nextSlot = slots[nextSlotIdx];
+      for (let i = 0; i < roundSlots.length; i += 2) {
+        const topSlot = roundSlots[i];
+        const bottomSlot = roundSlots[i + 1];
+        const nextSlot = nextRoundSlots[Math.floor(i / 2)];
 
+        if (topSlot && bottomSlot && nextSlot) {
           const startX = flipHorizontal ? topSlot.x : topSlot.x + SLOT_WIDTH;
           const endX = flipHorizontal ? nextSlot.x + SLOT_WIDTH : nextSlot.x;
           const midX = (startX + endX) / 2;
@@ -215,36 +222,37 @@ function RegionBracket({
     // Draw team slots
     const slotGroup = svg.append('g').attr('class', 'slots');
 
-    slots.filter(s => s.round === 0 && s.team).forEach((slot) => {
+    // Round 0 slots with teams
+    slots.filter(s => s.round === 0 && s.teamName).forEach((slot) => {
       const group = slotGroup.append('g')
         .attr('transform', `translate(${slot.x}, ${slot.y})`)
         .attr('cursor', 'pointer')
         .on('click', (event: MouseEvent) => {
           event.stopPropagation();
-          if (slot.team) selectTeam(slot.team.name);
+          selectTeam(slot.teamName);
         });
+
+      const delta = slot.teamInfo?.delta || 0;
 
       // Background rect
       group.append('rect')
         .attr('width', SLOT_WIDTH)
         .attr('height', SLOT_HEIGHT)
         .attr('rx', 3)
-        .attr('fill', slot.team ? getDeltaColor(slot.team.delta, maxDelta) : '#f3f4f6')
-        .attr('stroke', slot.team?.name === selectedTeam ? '#3b82f6' : '#d1d5db')
-        .attr('stroke-width', slot.team?.name === selectedTeam ? 2 : 1);
+        .attr('fill', getDeltaColor(delta, maxDelta))
+        .attr('stroke', slot.teamName === selectedTeam ? '#3b82f6' : '#d1d5db')
+        .attr('stroke-width', slot.teamName === selectedTeam ? 2 : 1);
 
       // Team name
-      if (slot.team) {
-        group.append('text')
-          .attr('x', 4)
-          .attr('y', SLOT_HEIGHT / 2 + 4)
-          .attr('font-size', '10px')
-          .attr('fill', '#374151')
-          .text(slot.team.name.length > 14 ? slot.team.name.substring(0, 12) + '..' : slot.team.name);
-      }
+      group.append('text')
+        .attr('x', 4)
+        .attr('y', SLOT_HEIGHT / 2 + 4)
+        .attr('font-size', '10px')
+        .attr('fill', '#374151')
+        .text(slot.teamName.length > 14 ? slot.teamName.substring(0, 12) + '..' : slot.teamName);
     });
 
-    // Draw empty slots for later rounds
+    // Empty slots for later rounds
     slots.filter(s => s.round > 0).forEach((slot) => {
       slotGroup.append('rect')
         .attr('x', slot.x)
@@ -257,7 +265,7 @@ function RegionBracket({
         .attr('stroke-width', 1);
     });
 
-  }, [teams, maxDelta, flipHorizontal, selectTeam, selectGame, selectedTeam, selectedGame]);
+  }, [games, teamInfoMap, maxDelta, flipHorizontal, selectTeam, selectGame, selectedTeam, selectedGame]);
 
   const width = 4 * (SLOT_WIDTH + ROUND_GAP);
   const height = 16 * (SLOT_HEIGHT + SLOT_GAP);
@@ -271,7 +279,8 @@ function RegionBracket({
 }
 
 export function BracketView() {
-  const { data: teams, isLoading } = useTeams();
+  const { data: teams, isLoading: teamsLoading } = useTeams();
+  const { data: bracket, isLoading: bracketLoading } = useBracket();
   const containerRef = useRef<HTMLDivElement>(null);
   const selectedTeam = useUIStore((state) => state.selectedTeam);
   const selectedGame = useUIStore((state) => state.selectedGame);
@@ -279,7 +288,6 @@ export function BracketView() {
   // Re-center bracket when sidebar opens/closes
   useLayoutEffect(() => {
     if (containerRef.current) {
-      // Scroll to center the bracket horizontally
       const container = containerRef.current;
       const scrollWidth = container.scrollWidth;
       const clientWidth = container.clientWidth;
@@ -288,6 +296,8 @@ export function BracketView() {
       }
     }
   }, [selectedTeam, selectedGame]);
+
+  const isLoading = teamsLoading || bracketLoading;
 
   if (isLoading) {
     return (
@@ -298,17 +308,29 @@ export function BracketView() {
     );
   }
 
-  if (!teams || teams.length === 0) {
+  if (!teams || teams.length === 0 || !bracket) {
     return (
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Tournament Bracket</h2>
-        <p className="text-gray-500">No teams available</p>
+        <p className="text-gray-500">No bracket data available</p>
       </div>
     );
   }
 
+  // Build a map of team name -> TeamInfo for quick lookup
+  const teamInfoMap = new Map<string, TeamInfo>();
+  teams.forEach(t => teamInfoMap.set(t.name, t));
+
+  // Calculate max delta for color scaling
   const maxDelta = Math.max(...teams.map((t) => Math.abs(t.delta)));
-  const regions = ['South', 'East', 'Midwest', 'West'];
+
+  // Split bracket games into regions (16 games each for 64-team bracket)
+  const regions = [
+    { name: 'South', games: bracket.games.slice(0, 16) },
+    { name: 'East', games: bracket.games.slice(16, 32) },
+    { name: 'Midwest', games: bracket.games.slice(32, 48) },
+    { name: 'West', games: bracket.games.slice(48, 64) },
+  ];
 
   return (
     <div ref={containerRef} className="bg-white rounded-lg shadow p-6 overflow-x-auto">
@@ -317,7 +339,7 @@ export function BracketView() {
         <div className="flex items-center gap-4 text-xs">
           <div className="flex items-center gap-1">
             <div className="w-4 h-4 rounded" style={{ backgroundColor: getDeltaColor(maxDelta, maxDelta) }}></div>
-            <span>Long</span>
+            <span>+Delta</span>
           </div>
           <div className="flex items-center gap-1">
             <div className="w-4 h-4 rounded bg-gray-200"></div>
@@ -325,7 +347,7 @@ export function BracketView() {
           </div>
           <div className="flex items-center gap-1">
             <div className="w-4 h-4 rounded" style={{ backgroundColor: getDeltaColor(-maxDelta, maxDelta) }}></div>
-            <span>Short</span>
+            <span>-Delta</span>
           </div>
         </div>
       </div>
@@ -333,26 +355,30 @@ export function BracketView() {
       <div className="grid grid-cols-2 gap-8">
         <div className="space-y-8">
           <RegionBracket
-            teams={getRegionTeams(teams, 0)}
-            regionName={regions[0]}
+            games={regions[0].games}
+            teamInfoMap={teamInfoMap}
+            regionName={regions[0].name}
             maxDelta={maxDelta}
           />
           <RegionBracket
-            teams={getRegionTeams(teams, 1)}
-            regionName={regions[1]}
+            games={regions[1].games}
+            teamInfoMap={teamInfoMap}
+            regionName={regions[1].name}
             maxDelta={maxDelta}
           />
         </div>
         <div className="space-y-8">
           <RegionBracket
-            teams={getRegionTeams(teams, 2)}
-            regionName={regions[2]}
+            games={regions[2].games}
+            teamInfoMap={teamInfoMap}
+            regionName={regions[2].name}
             maxDelta={maxDelta}
             flipHorizontal
           />
           <RegionBracket
-            teams={getRegionTeams(teams, 3)}
-            regionName={regions[3]}
+            games={regions[3].games}
+            teamInfoMap={teamInfoMap}
+            regionName={regions[3].name}
             maxDelta={maxDelta}
             flipHorizontal
           />
