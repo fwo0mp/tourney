@@ -89,7 +89,7 @@ class PortfolioService:
         return pv.get_portfolio_value(positions, scores)
 
     def get_portfolio_distribution(
-        self, n_simulations: int = 10000, seed: int = 42
+        self, n_simulations: int = 10000, seed: int = 42, n_bins: int = 50
     ) -> dict:
         """Calculate portfolio value distribution via Monte Carlo."""
         positions, _ = self.get_positions()
@@ -119,10 +119,28 @@ class PortfolioService:
             idx = int(p * n / 100)
             return values[min(idx, n - 1)]
 
+        # Build histogram
+        min_val = values[0]
+        max_val = values[-1]
+        bin_width = (max_val - min_val) / n_bins if max_val > min_val else 1
+        histogram = []
+        for i in range(n_bins):
+            bin_start = min_val + i * bin_width
+            bin_end = min_val + (i + 1) * bin_width
+            count = sum(1 for v in values if bin_start <= v < bin_end)
+            # Include max value in last bin
+            if i == n_bins - 1:
+                count += sum(1 for v in values if v == max_val)
+            histogram.append({
+                "bin_start": bin_start,
+                "bin_end": bin_end,
+                "count": count,
+            })
+
         return {
             "expected_value": self.get_portfolio_value(filtered_positions),
-            "min_value": values[0],
-            "max_value": values[-1],
+            "min_value": min_val,
+            "max_value": max_val,
             "p1": percentile(1),
             "p5": percentile(5),
             "p10": percentile(10),
@@ -132,6 +150,7 @@ class PortfolioService:
             "p90": percentile(90),
             "p95": percentile(95),
             "p99": percentile(99),
+            "histogram": histogram,
         }
 
     def get_all_deltas(self, point_delta: float = 1.0) -> tuple[dict, dict]:

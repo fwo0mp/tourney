@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useLayoutEffect } from 'react';
 import * as d3 from 'd3';
 import { useTeams } from '../../hooks/useTournament';
 import { useUIStore } from '../../store/uiStore';
@@ -7,7 +7,8 @@ import type { TeamInfo } from '../../types';
 const SLOT_WIDTH = 120;
 const SLOT_HEIGHT = 24;
 const ROUND_GAP = 40;
-const SLOT_GAP = 4;
+const SLOT_GAP = 8;
+const GAME_BOX_PADDING = 6;
 
 interface BracketSlot {
   team: TeamInfo | null;
@@ -15,6 +16,7 @@ interface BracketSlot {
   y: number;
   round: number;
   region: string;
+  slotIndex: number;
 }
 
 function getRegionTeams(teams: TeamInfo[], regionIndex: number): TeamInfo[] {
@@ -56,7 +58,9 @@ function RegionBracket({
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const selectTeam = useUIStore((state) => state.selectTeam);
+  const selectGame = useUIStore((state) => state.selectGame);
   const selectedTeam = useUIStore((state) => state.selectedTeam);
+  const selectedGame = useUIStore((state) => state.selectedGame);
 
   useEffect(() => {
     if (!svgRef.current || teams.length === 0) return;
@@ -71,6 +75,9 @@ function RegionBracket({
     // Round 4: 1 game (2 teams) - Sweet 16 winner
     const rounds = 4;
     const slots: BracketSlot[] = [];
+
+    // Standard bracket seed order: 1v16, 8v9, 5v12, 4v13, 6v11, 3v14, 7v10, 2v15
+    const seedOrder = [0, 15, 7, 8, 4, 11, 3, 12, 5, 10, 2, 13, 6, 9, 1, 14];
 
     // Build slot positions
     for (let round = 0; round < rounds; round++) {
@@ -87,13 +94,60 @@ function RegionBracket({
 
         let team: TeamInfo | null = null;
         if (round === 0) {
-          // First round - assign teams by seed order
-          // Standard bracket: 1v16, 8v9, 5v12, 4v13, 6v11, 3v14, 7v10, 2v15
-          const seedOrder = [0, 15, 7, 8, 4, 11, 3, 12, 5, 10, 2, 13, 6, 9, 1, 14];
           team = teams[seedOrder[i]] || null;
         }
 
-        slots.push({ team, x: roundX, y, round, region: regionName });
+        slots.push({ team, x: roundX, y, round, region: regionName, slotIndex: i });
+      }
+    }
+
+    // Draw game boxes first (lower z-index)
+    const gameBoxGroup = svg.append('g').attr('class', 'game-boxes');
+
+    // Only draw game boxes for round 0 (first round games with known teams)
+    const round0Slots = slots.filter(s => s.round === 0 && s.team);
+    for (let game = 0; game < 8; game++) {
+      const topSlot = round0Slots[game * 2];
+      const bottomSlot = round0Slots[game * 2 + 1];
+
+      if (topSlot?.team && bottomSlot?.team) {
+        const boxX = topSlot.x - GAME_BOX_PADDING;
+        const boxY = topSlot.y - GAME_BOX_PADDING;
+        const boxWidth = SLOT_WIDTH + GAME_BOX_PADDING * 2;
+        const boxHeight = (bottomSlot.y + SLOT_HEIGHT) - topSlot.y + GAME_BOX_PADDING * 2;
+
+        const isSelected = selectedGame &&
+          ((selectedGame.team1 === topSlot.team.name && selectedGame.team2 === bottomSlot.team.name) ||
+           (selectedGame.team1 === bottomSlot.team.name && selectedGame.team2 === topSlot.team.name));
+
+        gameBoxGroup.append('rect')
+          .attr('x', boxX)
+          .attr('y', boxY)
+          .attr('width', boxWidth)
+          .attr('height', boxHeight)
+          .attr('rx', 5)
+          .attr('fill', isSelected ? 'rgba(59, 130, 246, 0.1)' : 'transparent')
+          .attr('stroke', isSelected ? '#3b82f6' : '#e5e7eb')
+          .attr('stroke-width', isSelected ? 2 : 1)
+          .attr('stroke-dasharray', isSelected ? 'none' : '4,2')
+          .attr('cursor', 'pointer')
+          .on('click', (event: MouseEvent) => {
+            event.stopPropagation();
+            selectGame({ team1: topSlot.team!.name, team2: bottomSlot.team!.name });
+          })
+          .on('mouseenter', function() {
+            d3.select(this)
+              .attr('fill', 'rgba(59, 130, 246, 0.05)')
+              .attr('stroke', '#93c5fd');
+          })
+          .on('mouseleave', function() {
+            const stillSelected = selectedGame &&
+              ((selectedGame.team1 === topSlot.team!.name && selectedGame.team2 === bottomSlot.team!.name) ||
+               (selectedGame.team1 === bottomSlot.team!.name && selectedGame.team2 === topSlot.team!.name));
+            d3.select(this)
+              .attr('fill', stillSelected ? 'rgba(59, 130, 246, 0.1)' : 'transparent')
+              .attr('stroke', stillSelected ? '#3b82f6' : '#e5e7eb');
+          });
       }
     }
 
@@ -165,7 +219,8 @@ function RegionBracket({
       const group = slotGroup.append('g')
         .attr('transform', `translate(${slot.x}, ${slot.y})`)
         .attr('cursor', 'pointer')
-        .on('click', () => {
+        .on('click', (event: MouseEvent) => {
+          event.stopPropagation();
           if (slot.team) selectTeam(slot.team.name);
         });
 
@@ -202,7 +257,7 @@ function RegionBracket({
         .attr('stroke-width', 1);
     });
 
-  }, [teams, maxDelta, flipHorizontal, selectTeam, selectedTeam]);
+  }, [teams, maxDelta, flipHorizontal, selectTeam, selectGame, selectedTeam, selectedGame]);
 
   const width = 4 * (SLOT_WIDTH + ROUND_GAP);
   const height = 16 * (SLOT_HEIGHT + SLOT_GAP);
@@ -217,6 +272,22 @@ function RegionBracket({
 
 export function BracketView() {
   const { data: teams, isLoading } = useTeams();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const selectedTeam = useUIStore((state) => state.selectedTeam);
+  const selectedGame = useUIStore((state) => state.selectedGame);
+
+  // Re-center bracket when sidebar opens/closes
+  useLayoutEffect(() => {
+    if (containerRef.current) {
+      // Scroll to center the bracket horizontally
+      const container = containerRef.current;
+      const scrollWidth = container.scrollWidth;
+      const clientWidth = container.clientWidth;
+      if (scrollWidth > clientWidth) {
+        container.scrollLeft = (scrollWidth - clientWidth) / 2;
+      }
+    }
+  }, [selectedTeam, selectedGame]);
 
   if (isLoading) {
     return (
@@ -240,7 +311,7 @@ export function BracketView() {
   const regions = ['South', 'East', 'Midwest', 'West'];
 
   return (
-    <div className="bg-white rounded-lg shadow p-6 overflow-x-auto">
+    <div ref={containerRef} className="bg-white rounded-lg shadow p-6 overflow-x-auto">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-900">Tournament Bracket</h2>
         <div className="flex items-center gap-4 text-xs">

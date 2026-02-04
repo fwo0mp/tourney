@@ -6,13 +6,20 @@ interface WhatIfState {
   ratingAdjustments: Record<string, number>;
 }
 
+interface SelectedGame {
+  team1: string;
+  team2: string;
+}
+
 interface UIState {
   selectedTeam: string | null;
+  selectedGame: SelectedGame | null;
   bracketZoom: number;
   whatIf: WhatIfState;
 
   // Actions
   selectTeam: (team: string | null) => void;
+  selectGame: (game: SelectedGame | null) => void;
   setBracketZoom: (zoom: number) => void;
   setGameOutcome: (winner: string, loser: string) => void;
   removeGameOutcome: (winner: string, loser: string) => void;
@@ -23,13 +30,16 @@ interface UIState {
 
 export const useUIStore = create<UIState>((set) => ({
   selectedTeam: null,
+  selectedGame: null,
   bracketZoom: 1,
   whatIf: {
     gameOutcomes: [],
     ratingAdjustments: {},
   },
 
-  selectTeam: (team) => set({ selectedTeam: team }),
+  selectTeam: (team) => set({ selectedTeam: team, selectedGame: null }),
+
+  selectGame: (game) => set({ selectedGame: game, selectedTeam: null }),
 
   setBracketZoom: (zoom) => set({ bracketZoom: zoom }),
 

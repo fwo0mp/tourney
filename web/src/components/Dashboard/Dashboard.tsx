@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { PortfolioSummary } from './PortfolioSummary';
-import { LargestPositions } from './LargestPositions';
-import { LargestDeltas } from './LargestDeltas';
-import { BracketPreview } from '../Bracket/BracketPreview';
+import { TeamsTable } from './TeamsTable';
 import { BracketView } from '../Bracket/BracketView';
 import { WhatIfTool } from '../WhatIf';
 
@@ -48,21 +46,14 @@ export function Dashboard() {
       </div>
 
       {viewMode === 'overview' && (
-        <>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1">
-              <PortfolioSummary />
-            </div>
-            <div className="lg:col-span-2">
-              <BracketPreview />
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1">
+            <PortfolioSummary />
           </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <LargestPositions />
-            <LargestDeltas />
+          <div className="lg:col-span-2">
+            <TeamsTable />
           </div>
-        </>
+        </div>
       )}
 
       {viewMode === 'bracket' && <BracketView />}
