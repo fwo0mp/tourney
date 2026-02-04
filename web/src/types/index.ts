@@ -64,8 +64,19 @@ export interface BracketGame {
   teams: Record<string, number>;
 }
 
+export interface PlayInGame {
+  id: string;
+  slot_index: number;  // Which round 0 slot this feeds into
+  region: string | null;
+  team1: string;
+  team2: string;
+  team1_prob: number;
+  team2_prob: number;
+}
+
 export interface BracketResponse {
   games: BracketGame[];
+  play_in_games: PlayInGame[];
   num_teams: number;
   num_rounds: number;
 }

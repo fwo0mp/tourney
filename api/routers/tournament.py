@@ -3,7 +3,7 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from api.models import TeamInfo, BracketResponse, BracketGame
+from api.models import TeamInfo, BracketResponse, BracketGame, PlayInGame
 from api.services.tournament_service import TournamentService, get_tournament_service, apply_what_if
 from api.services.portfolio_service import PortfolioService, get_portfolio_service
 import portfolio_value as pv
@@ -125,20 +125,46 @@ def get_bracket(
         import math
         num_rounds = int(math.log2(num_teams))
 
-        games = []
-        for i, game in enumerate(bracket):
-            # Determine region based on position (for 64 teams)
-            if num_teams == 64:
-                if i < 16:
-                    region = "South"
-                elif i < 32:
-                    region = "East"
-                elif i < 48:
-                    region = "Midwest"
+        def get_region(idx: int, total: int) -> str | None:
+            """Determine region based on position."""
+            if total == 64:
+                if idx < 16:
+                    return "South"
+                elif idx < 32:
+                    return "East"
+                elif idx < 48:
+                    return "Midwest"
                 else:
-                    region = "West"
-            else:
-                region = None
+                    return "West"
+            return None
+
+        games = []
+        play_in_games = []
+
+        for i, game in enumerate(bracket):
+            region = get_region(i, num_teams)
+
+            # Check if this is a play-in game (has 2 teams with non-100% probabilities)
+            team_names = list(game.keys())
+            if len(team_names) == 2:
+                # Sort so higher probability team is first
+                probs = [(name, game[name]) for name in team_names]
+                probs.sort(key=lambda x: x[1], reverse=True)
+                team1, team1_prob = probs[0]
+                team2, team2_prob = probs[1]
+
+                # This is a play-in game
+                play_in_games.append(
+                    PlayInGame(
+                        id=f"playin_{i}",
+                        slot_index=i,
+                        region=region,
+                        team1=team1,
+                        team2=team2,
+                        team1_prob=team1_prob,
+                        team2_prob=team2_prob,
+                    )
+                )
 
             games.append(
                 BracketGame(
@@ -151,6 +177,7 @@ def get_bracket(
 
         return BracketResponse(
             games=games,
+            play_in_games=play_in_games,
             num_teams=num_teams,
             num_rounds=num_rounds,
         )

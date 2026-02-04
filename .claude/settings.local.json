@@ -14,7 +14,8 @@
       "Bash(cargo clean:*)",
       "Bash(npm run build:*)",
       "Bash(lsof:*)",
-      "Bash(nm:*)"
+      "Bash(nm:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

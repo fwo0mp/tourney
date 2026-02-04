@@ -107,10 +107,23 @@ class BracketGame(BaseModel):
     teams: dict[str, float]  # team_name -> win_probability
 
 
+class PlayInGame(BaseModel):
+    """A play-in game where two teams compete for one spot in round 0."""
+
+    id: str
+    slot_index: int  # Which round 0 slot this feeds into
+    region: str | None
+    team1: str
+    team2: str
+    team1_prob: float  # Probability team1 wins
+    team2_prob: float  # Probability team2 wins
+
+
 class BracketResponse(BaseModel):
     """Full bracket structure for visualization."""
 
     games: list[BracketGame]
+    play_in_games: list[PlayInGame] = []  # Play-in games (Round -1)
     num_teams: int
     num_rounds: int
 

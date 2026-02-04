@@ -3,7 +3,7 @@ import * as d3 from 'd3';
 import { useTeams, useBracket } from '../../hooks/useTournament';
 import { useUIStore } from '../../store/uiStore';
 import { MetaTeamModal } from './MetaTeamModal';
-import type { TeamInfo, BracketGame } from '../../types';
+import type { TeamInfo, BracketGame, PlayInGame } from '../../types';
 
 type BracketViewType = 'overall' | 'region1' | 'region2' | 'region3' | 'region4' | 'sweet16';
 
@@ -15,9 +15,10 @@ const SLOT_GAP = 8;
 const GAME_BOX_PADDING = 6;
 
 // Compact sizes for overall view to fit without scrolling
-const COMPACT_SLOT_WIDTH = 95;
-const COMPACT_ROUND_GAP = 25;
-const COMPACT_SLOT_GAP = 6;
+// With 6 columns (5 rounds + 1 play-in), these fit in ~1200px container
+const COMPACT_SLOT_WIDTH = 80;
+const COMPACT_ROUND_GAP = 18;
+const COMPACT_SLOT_GAP = 5;
 
 interface BracketSlot {
   teamName: string;
@@ -119,6 +120,7 @@ function buildWhatIfSlotMap(
 
 function RegionBracket({
   games,
+  playInGames = [],
   teamInfoMap,
   regionName,
   regionIndex,
@@ -127,6 +129,7 @@ function RegionBracket({
   compact = false,
 }: {
   games: BracketGame[];
+  playInGames?: PlayInGame[];
   teamInfoMap: Map<string, TeamInfo>;
   regionName: string;
   regionIndex: number;  // 0-3 for the four regions
@@ -155,6 +158,18 @@ function RegionBracket({
     const slotGap = compact ? COMPACT_SLOT_GAP : SLOT_GAP;
     const gameBoxPadding = GAME_BOX_PADDING;
 
+    // Check if this region has any play-in games
+    const hasPlayIns = playInGames.length > 0;
+
+    // Add top padding for play-in games that might extend above first slot
+    const topPadding = hasPlayIns ? 20 : 0;
+
+    // Create a transform group for all content
+    const contentGroup = svg.append('g')
+      .attr('transform', `translate(0, ${topPadding})`);
+    // Offset for all rounds to make room for play-in column
+    const playInOffset = hasPlayIns ? (slotWidth + roundGap) : 0;
+
     // Compute which teams are in later round slots based on what-if outcomes
     const whatIfSlotMap = buildWhatIfSlotMap(games, whatIf.gameOutcomes);
 
@@ -162,6 +177,9 @@ function RegionBracket({
     // For a 16-team region, we have 16 slots in round 0
     const slots: BracketSlot[] = [];
     const rounds = 5; // 16 -> 8 -> 4 -> 2 -> 1 (regional winner)
+
+    // Create a set of slot indices that have play-in games
+    const playInSlotIndices = new Set(playInGames.map(p => p.slot_index % 16));
 
     // Round 0: All 16 teams from the games
     games.forEach((game, i) => {
@@ -171,9 +189,11 @@ function RegionBracket({
       const teamName = teamEntries[0]?.[0] || '';
       const teamInfo = teamInfoMap.get(teamName) || null;
 
+      // When flipped, rounds go right-to-left, play-in is at far right
+      // When not flipped, rounds go left-to-right, play-in is at far left
       const roundX = flipHorizontal
-        ? (rounds - 1) * (slotWidth + roundGap)
-        : 0;
+        ? (rounds - 1) * (slotWidth + roundGap)  // No offset when flipped
+        : playInOffset;  // Offset when not flipped
       const y = i * (slotHeight + slotGap);
 
       slots.push({
@@ -195,8 +215,8 @@ function RegionBracket({
         const offset = (Math.pow(2, round) - 1) * (slotHeight + slotGap) / 2;
         const y = offset + i * spacing;
         const roundX = flipHorizontal
-          ? (rounds - 1 - round) * (slotWidth + roundGap)
-          : round * (slotWidth + roundGap);
+          ? (rounds - 1 - round) * (slotWidth + roundGap)  // No offset when flipped
+          : round * (slotWidth + roundGap) + playInOffset;  // Offset when not flipped
 
         // Check if there's a what-if selected team for this slot
         const slotKey = `${round}-${i}`;
@@ -215,7 +235,7 @@ function RegionBracket({
     }
 
     // Draw game boxes first (lower z-index) - for round 0 matchups
-    const gameBoxGroup = svg.append('g').attr('class', 'game-boxes');
+    const gameBoxGroup = contentGroup.append('g').attr('class', 'game-boxes');
 
     const round0Slots = slots.filter(s => s.round === 0);
     for (let matchup = 0; matchup < 8; matchup++) {
@@ -263,8 +283,176 @@ function RegionBracket({
       }
     }
 
+    // Draw play-in games if any
+    if (hasPlayIns) {
+      const playInGroup = contentGroup.append('g').attr('class', 'play-in-games');
+
+      playInGames.forEach((playIn) => {
+        // Calculate local slot index within this region
+        const localSlotIndex = playIn.slot_index % 16;
+        const y = localSlotIndex * (slotHeight + slotGap);
+
+        // Play-in game position (before round 0)
+        // When flipped, play-in is at far right; when not flipped, at far left
+        const playInX = flipHorizontal
+          ? rounds * (slotWidth + roundGap)  // Far right
+          : 0;  // Far left
+
+        // Draw the play-in game box with two teams
+        // Team 1 is at y - (slotHeight + slotGap)/2
+        // Team 2 is at y + (slotHeight + slotGap)/2
+        const team1Y = y - (slotHeight + slotGap) / 2;
+        const team2Y = y + (slotHeight + slotGap) / 2;
+
+        const team1Info = teamInfoMap.get(playIn.team1);
+        const team2Info = teamInfoMap.get(playIn.team2);
+        const delta1 = team1Info?.delta || 0;
+        const delta2 = team2Info?.delta || 0;
+
+        // Team 1 slot (top)
+        const team1Group = playInGroup.append('g')
+          .attr('transform', `translate(${playInX}, ${team1Y})`)
+          .attr('cursor', 'pointer')
+          .on('click', (event: MouseEvent) => {
+            event.stopPropagation();
+            selectTeam(playIn.team1);
+          });
+
+        team1Group.append('rect')
+          .attr('width', slotWidth)
+          .attr('height', slotHeight)
+          .attr('rx', 3)
+          .attr('fill', getDeltaColor(delta1, maxDelta))
+          .attr('stroke', playIn.team1 === selectedTeam ? '#3b82f6' : '#d1d5db')
+          .attr('stroke-width', playIn.team1 === selectedTeam ? 2 : 1);
+
+        const fontSize = compact ? '9px' : '10px';
+        const maxNameLen = compact ? 11 : 14;
+        team1Group.append('text')
+          .attr('x', 4)
+          .attr('y', slotHeight / 2 + 4)
+          .attr('font-size', fontSize)
+          .attr('fill', '#374151')
+          .text(playIn.team1.length > maxNameLen ? playIn.team1.substring(0, maxNameLen - 2) + '..' : playIn.team1);
+
+        // Win probability badge for team 1
+        team1Group.append('text')
+          .attr('x', slotWidth - 4)
+          .attr('y', slotHeight / 2 + 3)
+          .attr('text-anchor', 'end')
+          .attr('font-size', '8px')
+          .attr('fill', '#6b7280')
+          .text(`${Math.round(playIn.team1_prob * 100)}%`);
+
+        // Team 2 slot (bottom)
+        const team2Group = playInGroup.append('g')
+          .attr('transform', `translate(${playInX}, ${team2Y})`)
+          .attr('cursor', 'pointer')
+          .on('click', (event: MouseEvent) => {
+            event.stopPropagation();
+            selectTeam(playIn.team2);
+          });
+
+        team2Group.append('rect')
+          .attr('width', slotWidth)
+          .attr('height', slotHeight)
+          .attr('rx', 3)
+          .attr('fill', getDeltaColor(delta2, maxDelta))
+          .attr('stroke', playIn.team2 === selectedTeam ? '#3b82f6' : '#d1d5db')
+          .attr('stroke-width', playIn.team2 === selectedTeam ? 2 : 1);
+
+        team2Group.append('text')
+          .attr('x', 4)
+          .attr('y', slotHeight / 2 + 4)
+          .attr('font-size', fontSize)
+          .attr('fill', '#374151')
+          .text(playIn.team2.length > maxNameLen ? playIn.team2.substring(0, maxNameLen - 2) + '..' : playIn.team2);
+
+        // Win probability badge for team 2
+        team2Group.append('text')
+          .attr('x', slotWidth - 4)
+          .attr('y', slotHeight / 2 + 3)
+          .attr('text-anchor', 'end')
+          .attr('font-size', '8px')
+          .attr('fill', '#6b7280')
+          .text(`${Math.round(playIn.team2_prob * 100)}%`);
+
+        // Draw game box around both teams
+        const boxTop = team1Y - gameBoxPadding;
+        const boxBottom = team2Y + slotHeight + gameBoxPadding;
+        playInGroup.append('rect')
+          .attr('x', playInX - gameBoxPadding)
+          .attr('y', boxTop)
+          .attr('width', slotWidth + gameBoxPadding * 2)
+          .attr('height', boxBottom - boxTop)
+          .attr('rx', 5)
+          .attr('fill', 'none')
+          .attr('stroke', '#9ca3af')
+          .attr('stroke-width', 1)
+          .attr('stroke-dasharray', '4,2')
+          .attr('pointer-events', 'none');
+
+        // Add "vs" label between the two teams
+        const vsY = (team1Y + slotHeight + team2Y) / 2;
+        playInGroup.append('text')
+          .attr('x', playInX + slotWidth / 2)
+          .attr('y', vsY + 3)
+          .attr('text-anchor', 'middle')
+          .attr('font-size', '8px')
+          .attr('font-weight', '600')
+          .attr('fill', '#9ca3af')
+          .text('vs');
+
+        // Draw line connecting play-in to round 0 slot
+        // Calculate round 0 X position (same formula as slots above)
+        const round0X = flipHorizontal
+          ? (rounds - 1) * (slotWidth + roundGap)
+          : playInOffset;
+        const startX = flipHorizontal ? playInX : playInX + slotWidth;
+        const endX = flipHorizontal ? round0X + slotWidth : round0X;
+        const midX = (startX + endX) / 2;
+        const midY = y + slotHeight / 2;
+
+        // Lines from both play-in teams to the middle (from center of each team slot)
+        const line1Y = team1Y + slotHeight / 2;  // Team 1 center
+        const line2Y = team2Y + slotHeight / 2;  // Team 2 center
+
+        playInGroup.append('line')
+          .attr('x1', startX)
+          .attr('y1', line1Y)
+          .attr('x2', midX)
+          .attr('y2', line1Y)
+          .attr('stroke', '#d1d5db')
+          .attr('stroke-width', 1);
+
+        playInGroup.append('line')
+          .attr('x1', startX)
+          .attr('y1', line2Y)
+          .attr('x2', midX)
+          .attr('y2', line2Y)
+          .attr('stroke', '#d1d5db')
+          .attr('stroke-width', 1);
+
+        playInGroup.append('line')
+          .attr('x1', midX)
+          .attr('y1', line1Y)
+          .attr('x2', midX)
+          .attr('y2', line2Y)
+          .attr('stroke', '#d1d5db')
+          .attr('stroke-width', 1);
+
+        playInGroup.append('line')
+          .attr('x1', midX)
+          .attr('y1', midY)
+          .attr('x2', endX)
+          .attr('y2', midY)
+          .attr('stroke', '#d1d5db')
+          .attr('stroke-width', 1);
+      });
+    }
+
     // Draw connecting lines
-    const lineGroup = svg.append('g').attr('class', 'lines');
+    const lineGroup = contentGroup.append('g').attr('class', 'lines');
 
     for (let round = 0; round < rounds - 1; round++) {
       const roundSlots = slots.filter(s => s.round === round);
@@ -320,16 +508,27 @@ function RegionBracket({
     }
 
     // Draw team slots
-    const slotGroup = svg.append('g').attr('class', 'slots');
+    const slotGroup = contentGroup.append('g').attr('class', 'slots');
 
     // Round 0 slots with teams
     slots.filter(s => s.round === 0 && s.teamName).forEach((slot) => {
+      // Check if this slot has a play-in game (multiple teams)
+      const isPlayInSlot = playInSlotIndices.has(slot.slotIndex);
+      // Calculate global position for modal
+      const slotsPerRegionRound0 = 16;
+      const globalPosition = regionIndex * slotsPerRegionRound0 + slot.slotIndex;
+
       const group = slotGroup.append('g')
         .attr('transform', `translate(${slot.x}, ${slot.y})`)
         .attr('cursor', 'pointer')
         .on('click', (event: MouseEvent) => {
           event.stopPropagation();
-          selectTeam(slot.teamName);
+          if (isPlayInSlot) {
+            // For play-in slots, open modal to show both candidates
+            openMetaTeamModal(0, globalPosition);
+          } else {
+            selectTeam(slot.teamName);
+          }
         });
 
       const delta = slot.teamInfo?.delta || 0;
@@ -437,13 +636,18 @@ function RegionBracket({
       }
     });
 
-  }, [games, teamInfoMap, maxDelta, flipHorizontal, compact, selectTeam, selectGame, selectedTeam, selectedGame, regionIndex, openMetaTeamModal, whatIf]);
+  }, [games, playInGames, teamInfoMap, maxDelta, flipHorizontal, compact, selectTeam, selectGame, selectedTeam, selectedGame, regionIndex, openMetaTeamModal, whatIf]);
 
   const slotWidth = compact ? COMPACT_SLOT_WIDTH : SLOT_WIDTH;
   const roundGap = compact ? COMPACT_ROUND_GAP : ROUND_GAP;
   const slotGap = compact ? COMPACT_SLOT_GAP : SLOT_GAP;
-  const width = 5 * (slotWidth + roundGap);
-  const height = 16 * (SLOT_HEIGHT + slotGap);
+  const hasPlayIns = playInGames.length > 0;
+  // Width = 5 rounds + 1 play-in column (if any)
+  const numColumns = 5 + (hasPlayIns ? 1 : 0);
+  const width = numColumns * (slotWidth + roundGap);
+  // Add padding for play-in games that might extend above first slot
+  const topPadding = hasPlayIns ? 20 : 0;
+  const height = 16 * (SLOT_HEIGHT + slotGap) + topPadding;
 
   return (
     <div>
@@ -801,11 +1005,25 @@ export function BracketView() {
   const maxDelta = Math.max(...teams.map((t) => Math.abs(t.delta)));
 
   // Split bracket games into regions (16 games each for 64-team bracket)
+  // Also split play-in games by region based on their slot_index
+  const playInGames = bracket.play_in_games || [];
   const regions = [
-    { games: bracket.games.slice(0, 16) },
-    { games: bracket.games.slice(16, 32) },
-    { games: bracket.games.slice(32, 48) },
-    { games: bracket.games.slice(48, 64) },
+    {
+      games: bracket.games.slice(0, 16),
+      playInGames: playInGames.filter(p => p.slot_index < 16),
+    },
+    {
+      games: bracket.games.slice(16, 32),
+      playInGames: playInGames.filter(p => p.slot_index >= 16 && p.slot_index < 32),
+    },
+    {
+      games: bracket.games.slice(32, 48),
+      playInGames: playInGames.filter(p => p.slot_index >= 32 && p.slot_index < 48),
+    },
+    {
+      games: bracket.games.slice(48, 64),
+      playInGames: playInGames.filter(p => p.slot_index >= 48 && p.slot_index < 64),
+    },
   ];
 
   // Get first team name from each region for dropdown labels
@@ -833,6 +1051,7 @@ export function BracketView() {
         return (
           <RegionBracket
             games={regions[0].games}
+            playInGames={regions[0].playInGames}
             teamInfoMap={teamInfoMap}
             regionName={`Region 1 (${getFirstTeamName(regions[0].games)})`}
             regionIndex={0}
@@ -843,6 +1062,7 @@ export function BracketView() {
         return (
           <RegionBracket
             games={regions[1].games}
+            playInGames={regions[1].playInGames}
             teamInfoMap={teamInfoMap}
             regionName={`Region 2 (${getFirstTeamName(regions[1].games)})`}
             regionIndex={1}
@@ -853,6 +1073,7 @@ export function BracketView() {
         return (
           <RegionBracket
             games={regions[2].games}
+            playInGames={regions[2].playInGames}
             teamInfoMap={teamInfoMap}
             regionName={`Region 3 (${getFirstTeamName(regions[2].games)})`}
             regionIndex={2}
@@ -863,6 +1084,7 @@ export function BracketView() {
         return (
           <RegionBracket
             games={regions[3].games}
+            playInGames={regions[3].playInGames}
             teamInfoMap={teamInfoMap}
             regionName={`Region 4 (${getFirstTeamName(regions[3].games)})`}
             regionIndex={3}
@@ -881,10 +1103,11 @@ export function BracketView() {
       case 'overall':
       default:
         return (
-          <div className="inline-grid grid-cols-2 gap-4">
+          <div className="inline-grid grid-cols-2 gap-4 mx-auto">
             <div className="space-y-6">
               <RegionBracket
                 games={regions[0].games}
+                playInGames={regions[0].playInGames}
                 teamInfoMap={teamInfoMap}
                 regionName={`Region 1 (${getFirstTeamName(regions[0].games)})`}
                 regionIndex={0}
@@ -893,6 +1116,7 @@ export function BracketView() {
               />
               <RegionBracket
                 games={regions[1].games}
+                playInGames={regions[1].playInGames}
                 teamInfoMap={teamInfoMap}
                 regionName={`Region 2 (${getFirstTeamName(regions[1].games)})`}
                 regionIndex={1}
@@ -903,6 +1127,7 @@ export function BracketView() {
             <div className="space-y-6">
               <RegionBracket
                 games={regions[2].games}
+                playInGames={regions[2].playInGames}
                 teamInfoMap={teamInfoMap}
                 regionName={`Region 3 (${getFirstTeamName(regions[2].games)})`}
                 regionIndex={2}
@@ -912,6 +1137,7 @@ export function BracketView() {
               />
               <RegionBracket
                 games={regions[3].games}
+                playInGames={regions[3].playInGames}
                 teamInfoMap={teamInfoMap}
                 regionName={`Region 4 (${getFirstTeamName(regions[3].games)})`}
                 regionIndex={3}
