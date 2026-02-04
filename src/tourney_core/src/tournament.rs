@@ -142,6 +142,32 @@ impl TournamentState {
         }
         new_state
     }
+
+    /// Calculate scores for multiple override scenarios in parallel.
+    ///
+    /// Takes a list of override scenarios, where each scenario is a list of
+    /// (winner, loser, probability) tuples. Returns a list of score maps.
+    ///
+    /// This is much more efficient than calling calculate_scores_prob()
+    /// multiple times from Python, as it avoids GIL overhead and uses
+    /// true parallelism via Rayon.
+    pub fn calculate_scores_prob_batch(
+        &self,
+        override_scenarios: Vec<Vec<(String, String, f64)>>,
+    ) -> Vec<HashMap<String, f64>> {
+        override_scenarios
+            .par_iter()
+            .map(|overrides| {
+                // Create modified state with these overrides
+                let mut state = self.clone();
+                for (team1, team2, prob) in overrides {
+                    state.overrides.add_override(team1, team2, *prob);
+                }
+                // Calculate scores
+                state.calculate_scores_internal(false, None)
+            })
+            .collect()
+    }
 }
 
 impl TournamentState {
@@ -274,3 +300,4 @@ mod tests {
         assert!(teams.contains(&"D".to_string()));
     }
 }
+// Test method to verify compilation

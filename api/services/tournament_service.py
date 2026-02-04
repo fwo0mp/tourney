@@ -265,13 +265,16 @@ def get_slot_teams(state: tourney.TournamentState, target_round: int, position: 
     return round_slots[position]
 
 
-def compute_path_to_slot(
+def compute_path_to_slot_with_rounds(
     state: tourney.TournamentState,
+    rounds: list[list[dict]],
     team: str,
     target_round: int,
     target_position: int,
 ) -> list[tuple[str, str]]:
     """Compute the game outcomes (winner, loser) needed for team to reach slot.
+
+    This version accepts precomputed rounds to avoid redundant computation.
 
     Returns a list of (winner, loser) tuples for all games the team must win.
     The team must beat ALL possible opponents they could face, not just the most likely.
@@ -289,7 +292,6 @@ def compute_path_to_slot(
 
     outcomes = []
     current_pos = start_pos
-    rounds = compute_bracket_rounds(state)
 
     for round_num in range(target_round):
         if round_num >= len(rounds):
@@ -317,7 +319,6 @@ def compute_path_to_slot(
         opponent_slot = round_slots[opponent_pos]
 
         # The team must beat ALL possible opponents from the opposing slot
-        # Add an override for each potential opponent
         if opponent_slot:
             for opponent in opponent_slot.keys():
                 if opponent != team:  # Don't add self as opponent
@@ -327,3 +328,20 @@ def compute_path_to_slot(
         current_pos = current_pos // 2
 
     return outcomes
+
+
+def compute_path_to_slot(
+    state: tourney.TournamentState,
+    team: str,
+    target_round: int,
+    target_position: int,
+) -> list[tuple[str, str]]:
+    """Compute the game outcomes (winner, loser) needed for team to reach slot.
+
+    Returns a list of (winner, loser) tuples for all games the team must win.
+    The team must beat ALL possible opponents they could face, not just the most likely.
+    """
+    rounds = compute_bracket_rounds(state)
+    return compute_path_to_slot_with_rounds(state, rounds, team, target_round, target_position)
+
+

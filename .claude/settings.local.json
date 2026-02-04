@@ -13,7 +13,8 @@
       "Bash(uv run maturin:*)",
       "Bash(cargo clean:*)",
       "Bash(npm run build:*)",
-      "Bash(lsof:*)"
+      "Bash(lsof:*)",
+      "Bash(nm:*)"
     ]
   }
 }

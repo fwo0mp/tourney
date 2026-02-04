@@ -1,9 +1,11 @@
 """Portfolio API endpoints."""
 
+import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.models import PositionsResponse, PortfolioSummary, DeltasResponse
 from api.services.portfolio_service import PortfolioService, get_portfolio_service
+from api.services.tournament_service import TournamentService, get_tournament_service, apply_what_if
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
@@ -33,11 +35,36 @@ def get_value(
 def get_distribution(
     n_simulations: int = Query(default=10000, ge=100, le=100000),
     seed: int = Query(default=42),
+    what_if_outcomes: str = Query(default=None, description="JSON-encoded game outcomes"),
+    what_if_adjustments: str = Query(default=None, description="JSON-encoded rating adjustments"),
     portfolio: PortfolioService = Depends(get_portfolio_service),
+    tournament: TournamentService = Depends(get_tournament_service),
 ):
-    """Get portfolio value distribution from Monte Carlo simulations."""
+    """Get portfolio value distribution from Monte Carlo simulations.
+
+    Optionally apply what-if scenarios before running simulations.
+    """
     try:
-        dist = portfolio.get_portfolio_distribution(n_simulations, seed)
+        # Parse what-if parameters
+        outcomes = []
+        adjustments = {}
+        if what_if_outcomes:
+            try:
+                outcomes = json.loads(what_if_outcomes)
+            except json.JSONDecodeError:
+                pass
+        if what_if_adjustments:
+            try:
+                adjustments = json.loads(what_if_adjustments)
+            except json.JSONDecodeError:
+                pass
+
+        # Get tournament state, optionally with what-if modifications
+        state = tournament.get_state()
+        if outcomes or adjustments:
+            state = apply_what_if(state, game_outcomes=outcomes, rating_adjustments=adjustments)
+
+        dist = portfolio.get_portfolio_distribution(n_simulations, seed, state=state)
         return PortfolioSummary(**dist)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))

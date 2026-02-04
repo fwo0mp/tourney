@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { portfolioApi } from '../api/portfolio';
+import { useUIStore } from '../store/uiStore';
 
 export function usePositions() {
   return useQuery({
@@ -20,9 +21,13 @@ export function usePortfolioValue() {
 }
 
 export function usePortfolioDistribution(nSimulations = 10000) {
+  // Get whatIf state but DON'T include in query key.
+  // This way, changing what-if doesn't auto-trigger expensive simulation.
+  // User must click "Re-simulate" to explicitly recompute with current what-if state.
+  const whatIf = useUIStore((state) => state.whatIf);
   return useQuery({
     queryKey: ['portfolio', 'distribution', nSimulations],
-    queryFn: () => portfolioApi.getDistribution(nSimulations),
+    queryFn: () => portfolioApi.getDistribution(nSimulations, whatIf),
     staleTime: 5 * 60_000,
   });
 }

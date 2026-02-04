@@ -1,11 +1,20 @@
 import { api } from './client';
-import type { PositionsResponse, PortfolioSummary, DeltasResponse } from '../types';
+import type { PositionsResponse, PortfolioSummary, DeltasResponse, WhatIfState } from '../types';
 
 export const portfolioApi = {
   getPositions: () => api.get<PositionsResponse>('/portfolio/positions'),
   getValue: () => api.get<{ expected_value: number }>('/portfolio/value'),
-  getDistribution: (nSimulations = 10000) =>
-    api.get<PortfolioSummary>(`/portfolio/distribution?n_simulations=${nSimulations}`),
+  getDistribution: (nSimulations = 10000, whatIf?: WhatIfState) => {
+    const params = new URLSearchParams();
+    params.set('n_simulations', String(nSimulations));
+    if (whatIf && whatIf.gameOutcomes.length > 0) {
+      params.set('what_if_outcomes', JSON.stringify(whatIf.gameOutcomes));
+    }
+    if (whatIf && Object.keys(whatIf.ratingAdjustments).length > 0) {
+      params.set('what_if_adjustments', JSON.stringify(whatIf.ratingAdjustments));
+    }
+    return api.get<PortfolioSummary>(`/portfolio/distribution?${params.toString()}`);
+  },
   getDeltas: (pointDelta = 1.0) =>
     api.get<DeltasResponse>(`/portfolio/deltas?point_delta=${pointDelta}`),
   getTeamImpact: (teamName: string, pointDelta = 1.0) =>

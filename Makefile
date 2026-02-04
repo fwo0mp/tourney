@@ -1,9 +1,17 @@
-.PHONY: backend backend-mock frontend dev dev-mock install install-frontend find-port
+.PHONY: backend backend-mock frontend dev dev-mock install install-frontend find-port build-rust
 
 # Find an available port starting from 8000
 define find_port
 $(shell python3 -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
 endef
+
+# Build Rust extension (clears uv cache to prevent stale versions)
+# Run this after making changes to src/tourney_core/
+build-rust:
+	@echo "Clearing uv cache for tourney package..."
+	@rm -rf ~/.cache/uv/sdists-v8/editable/e0de2fa0087c936d 2>/dev/null || true
+	@echo "Building Rust extension..."
+	uv run maturin develop --release
 
 # Backend on fixed port 8000
 backend:

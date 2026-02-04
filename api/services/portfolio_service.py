@@ -89,12 +89,22 @@ class PortfolioService:
         return pv.get_portfolio_value(positions, scores)
 
     def get_portfolio_distribution(
-        self, n_simulations: int = 10000, seed: int = 42, n_bins: int = 50
+        self, n_simulations: int = 10000, seed: int = 42, n_bins: int = 50,
+        state=None,
     ) -> dict:
-        """Calculate portfolio value distribution via Monte Carlo."""
+        """Calculate portfolio value distribution via Monte Carlo.
+
+        Args:
+            n_simulations: Number of Monte Carlo simulations to run
+            seed: Random seed for reproducibility
+            n_bins: Number of histogram bins
+            state: Optional tournament state with what-if modifications applied.
+                   If None, uses the base tournament state.
+        """
         positions, _ = self.get_positions()
-        tournament = get_tournament_service()
-        state = tournament.get_state()
+        if state is None:
+            tournament = get_tournament_service()
+            state = tournament.get_state()
 
         # Filter positions to only include teams in the bracket
         bracket_teams = set(state.get_bracket_teams())
@@ -137,8 +147,12 @@ class PortfolioService:
                 "count": count,
             })
 
+        # Calculate expected value using the (possibly modified) state
+        expected_scores = state.calculate_scores_prob()
+        expected_value = pv.get_portfolio_value(filtered_positions, expected_scores)
+
         return {
-            "expected_value": self.get_portfolio_value(filtered_positions),
+            "expected_value": expected_value,
             "min_value": min_val,
             "max_value": max_val,
             "p1": percentile(1),
@@ -251,6 +265,8 @@ def get_slot_candidates_with_deltas(
 ) -> list[dict]:
     """Get all teams that can reach a slot with their probabilities and portfolio deltas.
 
+    Uses Rust batch parallelization for fast score computation.
+
     Args:
         portfolio_service: The portfolio service instance
         state: The tournament state (possibly with what-if modifications applied)
@@ -260,9 +276,8 @@ def get_slot_candidates_with_deltas(
     Returns a list of dicts with keys: team, probability, portfolio_delta
     """
     from api.services.tournament_service import (
-        get_slot_teams,
-        compute_path_to_slot,
-        apply_what_if,
+        compute_bracket_rounds,
+        compute_path_to_slot_with_rounds,
     )
 
     positions, _ = portfolio_service.get_positions()
@@ -271,30 +286,51 @@ def get_slot_candidates_with_deltas(
     current_scores = state.calculate_scores_prob()
     current_value = pv.get_portfolio_value(positions, current_scores)
 
-    # Get teams that can reach this slot
-    slot_teams = get_slot_teams(state, target_round, target_position)
+    # Compute bracket rounds ONCE (this is the expensive part)
+    rounds = compute_bracket_rounds(state)
 
-    candidates = []
-    for team, probability in slot_teams.items():
-        if probability < 0.001:  # Skip negligible probabilities
-            continue
+    # Get teams from the target slot
+    if target_round >= len(rounds) or target_position >= len(rounds[target_round]):
+        return []
 
-        # Compute path for this team to reach the slot
-        path = compute_path_to_slot(state, team, target_round, target_position)
+    slot_teams = rounds[target_round][target_position]
 
+    # Filter to teams with non-negligible probability
+    candidates_info = [
+        (team, prob) for team, prob in slot_teams.items() if prob >= 0.001
+    ]
+
+    if not candidates_info:
+        return []
+
+    # Build override scenarios for batch computation, reusing precomputed rounds
+    scenarios = []
+    for team, prob in candidates_info:
+        path = compute_path_to_slot_with_rounds(
+            state, rounds, team, target_round, target_position
+        )
         if path:
-            # Apply overrides and compute new value
-            game_outcomes = [{"winner": w, "loser": l} for w, l in path]
-            modified_state = apply_what_if(state, game_outcomes=game_outcomes)
-            modified_scores = modified_state.calculate_scores_prob()
-            modified_value = pv.get_portfolio_value(positions, modified_scores)
+            # Convert to overrides format: list of (winner, loser, prob)
+            overrides = [(w, l, 1.0) for w, l in path]
+            scenarios.append(overrides)
+        else:
+            scenarios.append([])
+
+    # Compute all scores in parallel using Rust
+    batch_results = state.calculate_scores_prob_batch(scenarios)
+
+    # Calculate portfolio deltas from batch results
+    candidates = []
+    for (team, prob), scores in zip(candidates_info, batch_results):
+        if scores:
+            modified_value = pv.get_portfolio_value(positions, scores)
             portfolio_delta = modified_value - current_value
         else:
             portfolio_delta = 0.0
 
         candidates.append({
             "team": team,
-            "probability": probability,
+            "probability": prob,
             "portfolio_delta": portfolio_delta,
         })
 
