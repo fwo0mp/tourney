@@ -9,6 +9,12 @@ export interface TeamInfo {
   delta: number;
 }
 
+export interface HistogramBin {
+  bin_start: number;
+  bin_end: number;
+  count: number;
+}
+
 export interface PortfolioSummary {
   expected_value: number;
   min_value: number;
@@ -22,6 +28,7 @@ export interface PortfolioSummary {
   p90: number;
   p95: number;
   p99: number;
+  histogram: HistogramBin[];
 }
 
 export interface GameImpact {

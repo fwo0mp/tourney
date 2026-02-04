@@ -16,6 +16,14 @@ class TeamInfo(BaseModel):
     delta: float = 0.0
 
 
+class HistogramBin(BaseModel):
+    """A single bin in a histogram."""
+
+    bin_start: float
+    bin_end: float
+    count: int
+
+
 class PortfolioSummary(BaseModel):
     """Portfolio value distribution from Monte Carlo simulations."""
 
@@ -31,6 +39,7 @@ class PortfolioSummary(BaseModel):
     p90: float
     p95: float
     p99: float
+    histogram: list[HistogramBin] = []
 
 
 class GameImpact(BaseModel):
