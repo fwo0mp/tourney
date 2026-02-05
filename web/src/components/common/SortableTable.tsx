@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 
 // Sort modes: absolute value descending, descending, ascending
 export type SortMode = 'abs-desc' | 'desc' | 'asc';
@@ -38,11 +38,11 @@ export function useSortState<T extends string>(defaultColumn: T, defaultMode: So
 }
 
 // Generic sort function for arrays
-export function sortData<T>(
+export function sortData<T, C extends string = string>(
   data: T[],
-  sortColumn: keyof T,
+  sortColumn: C,
   sortMode: SortMode,
-  getValue: (item: T, column: keyof T) => number | string
+  getValue: (item: T, column: C) => number | string
 ): T[] {
   return [...data].sort((a, b) => {
     const aVal = getValue(a, sortColumn);

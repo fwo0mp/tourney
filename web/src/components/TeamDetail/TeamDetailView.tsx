@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useTeams, useTeam, useScoringConfig } from '../../hooks/useTournament';
 import { useTeamImpact, usePositions, useDeltas, useHypotheticalPortfolio } from '../../hooks/usePortfolio';
 import { useUIStore } from '../../store/uiStore';
-import { SortHeader, StaticHeader, useSortState, sortData } from '../common';
+import { SortHeader, useSortState, sortData } from '../common';
 
 type DeltaRiskSortColumn = 'team' | 'currentDelta' | 'deltaChange' | 'newDelta';
 

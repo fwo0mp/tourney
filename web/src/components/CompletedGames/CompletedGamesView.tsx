@@ -144,7 +144,7 @@ export function CompletedGamesView() {
                 </tr>
               </thead>
               <tbody>
-                {completedGames?.map((game, idx) => (
+                {completedGames?.map((game) => (
                   <tr key={`${game.winner}-${game.loser}`} className="border-b border-gray-100">
                     <td className="py-3 text-sm font-medium text-green-700">{game.winner}</td>
                     <td className="py-3 text-sm text-gray-400 line-through">{game.loser}</td>

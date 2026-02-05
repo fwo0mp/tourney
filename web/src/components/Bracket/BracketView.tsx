@@ -178,6 +178,13 @@ function RegionBracket({
     const completedWinners = new Set(completedGames.map(g => g.winner));
     const eliminatedTeams = new Set(completedGames.map(g => g.loser));
 
+    // Helper to check if a game between two teams is already completed
+    const isGameCompleted = (team1: string, team2: string) =>
+      completedGames.some(
+        g => (g.winner === team1 && g.loser === team2) ||
+             (g.winner === team2 && g.loser === team1)
+      );
+
     // Compute which teams are in later round slots based on completed games and what-if outcomes
     // Completed games take priority over what-if outcomes
     const completedSlotMap = buildSlotMapFromOutcomes(games, completedGames);
@@ -320,15 +327,19 @@ function RegionBracket({
           .attr('fill', isSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(219, 234, 254, 0.6)')
           .attr('stroke', isSelected ? '#3b82f6' : '#93c5fd')
           .attr('stroke-width', isSelected ? 2 : 1)
-          .attr('cursor', 'pointer')
+          .attr('cursor', isGameCompleted(topSlot.teamName, bottomSlot.teamName) ? 'default' : 'pointer')
           .on('click', (event: MouseEvent) => {
             event.stopPropagation();
-            selectGame({ team1: topSlot.teamName, team2: bottomSlot.teamName, bothConfirmedFromCompleted: true });
+            if (!isGameCompleted(topSlot.teamName, bottomSlot.teamName)) {
+              selectGame({ team1: topSlot.teamName, team2: bottomSlot.teamName, bothConfirmedFromCompleted: true });
+            }
           })
           .on('mouseenter', function() {
-            d3.select(this)
-              .attr('fill', 'rgba(59, 130, 246, 0.15)')
-              .attr('stroke', '#3b82f6');
+            if (!isGameCompleted(topSlot.teamName, bottomSlot.teamName)) {
+              d3.select(this)
+                .attr('fill', 'rgba(59, 130, 246, 0.15)')
+                .attr('stroke', '#3b82f6');
+            }
           })
           .on('mouseleave', function() {
             const stillSelected = selectedGame &&
@@ -365,6 +376,8 @@ function RegionBracket({
           // Both teams confirmed only if both are from completed games
           const bothConfirmed = !!topSlot.isFromCompletedGame && !!bottomSlot.isFromCompletedGame;
 
+          const gameCompleted = isGameCompleted(topSlot.teamName, bottomSlot.teamName);
+
           gameBoxGroup.append('rect')
             .attr('x', boxX)
             .attr('y', boxY)
@@ -374,19 +387,23 @@ function RegionBracket({
             .attr('fill', isSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(219, 234, 254, 0.6)')  // blue-100 with opacity
             .attr('stroke', isSelected ? '#3b82f6' : '#93c5fd')  // blue-500 or blue-300
             .attr('stroke-width', isSelected ? 2 : 1)
-            .attr('cursor', 'pointer')
+            .attr('cursor', gameCompleted ? 'default' : 'pointer')
             .on('click', (event: MouseEvent) => {
               event.stopPropagation();
-              selectGame({
-                team1: topSlot.teamName,
-                team2: bottomSlot.teamName,
-                bothConfirmedFromCompleted: bothConfirmed,
-              });
+              if (!gameCompleted) {
+                selectGame({
+                  team1: topSlot.teamName,
+                  team2: bottomSlot.teamName,
+                  bothConfirmedFromCompleted: bothConfirmed,
+                });
+              }
             })
             .on('mouseenter', function() {
-              d3.select(this)
-                .attr('fill', 'rgba(59, 130, 246, 0.15)')
-                .attr('stroke', '#3b82f6');
+              if (!gameCompleted) {
+                d3.select(this)
+                  .attr('fill', 'rgba(59, 130, 246, 0.15)')
+                  .attr('stroke', '#3b82f6');
+              }
             })
             .on('mouseleave', function() {
               const stillSelected = selectedGame &&
@@ -540,6 +557,7 @@ function RegionBracket({
         const playInSelected = selectedGame &&
           ((selectedGame.team1 === playIn.team1 && selectedGame.team2 === playIn.team2) ||
            (selectedGame.team1 === playIn.team2 && selectedGame.team2 === playIn.team1));
+        const playInCompleted = isGameCompleted(playIn.team1, playIn.team2);
 
         playInGroup.append('rect')
           .attr('x', playInX - gameBoxPadding)
@@ -550,15 +568,19 @@ function RegionBracket({
           .attr('fill', playInSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(219, 234, 254, 0.6)')
           .attr('stroke', playInSelected ? '#3b82f6' : '#93c5fd')
           .attr('stroke-width', playInSelected ? 2 : 1)
-          .attr('cursor', 'pointer')
+          .attr('cursor', playInCompleted ? 'default' : 'pointer')
           .on('click', (event: MouseEvent) => {
             event.stopPropagation();
-            selectGame({ team1: playIn.team1, team2: playIn.team2, bothConfirmedFromCompleted: true });
+            if (!playInCompleted) {
+              selectGame({ team1: playIn.team1, team2: playIn.team2, bothConfirmedFromCompleted: true });
+            }
           })
           .on('mouseenter', function() {
-            d3.select(this)
-              .attr('fill', 'rgba(59, 130, 246, 0.15)')
-              .attr('stroke', '#3b82f6');
+            if (!playInCompleted) {
+              d3.select(this)
+                .attr('fill', 'rgba(59, 130, 246, 0.15)')
+                .attr('stroke', '#3b82f6');
+            }
           })
           .on('mouseleave', function() {
             const stillSelected = selectedGame &&
