@@ -12,9 +12,12 @@ export function usePositions() {
 }
 
 export function usePortfolioValue() {
+  // Include whatIf in query key so EV updates reactively on what-if changes
+  // This is a cheap probabilistic calculation, so it's safe to call frequently
+  const whatIf = useUIStore((state) => state.whatIf);
   return useQuery({
-    queryKey: ['portfolio', 'value'],
-    queryFn: portfolioApi.getValue,
+    queryKey: ['portfolio', 'value', whatIf],
+    queryFn: () => portfolioApi.getValue(whatIf),
     staleTime: 30_000,
     refetchInterval: 60_000,
   });

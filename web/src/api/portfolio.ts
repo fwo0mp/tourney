@@ -3,7 +3,17 @@ import type { PositionsResponse, PortfolioSummary, DeltasResponse, WhatIfState }
 
 export const portfolioApi = {
   getPositions: () => api.get<PositionsResponse>('/portfolio/positions'),
-  getValue: () => api.get<{ expected_value: number }>('/portfolio/value'),
+  getValue: (whatIf?: WhatIfState) => {
+    const params = new URLSearchParams();
+    if (whatIf && whatIf.gameOutcomes.length > 0) {
+      params.set('what_if_outcomes', JSON.stringify(whatIf.gameOutcomes));
+    }
+    if (whatIf && Object.keys(whatIf.ratingAdjustments).length > 0) {
+      params.set('what_if_adjustments', JSON.stringify(whatIf.ratingAdjustments));
+    }
+    const queryString = params.toString();
+    return api.get<{ expected_value: number }>(`/portfolio/value${queryString ? `?${queryString}` : ''}`);
+  },
   getDistribution: (nSimulations = 10000, whatIf?: WhatIfState) => {
     const params = new URLSearchParams();
     params.set('n_simulations', String(nSimulations));

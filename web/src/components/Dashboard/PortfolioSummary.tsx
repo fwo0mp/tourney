@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import { usePortfolioDistribution, usePositions } from '../../hooks/usePortfolio';
+import { usePortfolioDistribution, usePortfolioValue, usePositions } from '../../hooks/usePortfolio';
 import { useUIStore } from '../../store/uiStore';
 import type { PortfolioSummary as PortfolioSummaryType } from '../../types';
 
@@ -135,13 +135,20 @@ function DistributionChart({ distribution }: { distribution: PortfolioSummaryTyp
 
 export function PortfolioSummary() {
   const [nSimulations, setNSimulations] = useState(10000);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const { data: positions, isLoading: posLoading } = usePositions();
+  // Reactive EV that updates immediately on what-if changes (cheap calculation)
+  const { data: liveValue, isLoading: evLoading } = usePortfolioValue();
+  // Monte Carlo distribution (expensive) - only updates on explicit resimulate
   const { data: distribution, isLoading: distLoading, refetch } = usePortfolioDistribution(nSimulations);
   const monteCarloStale = useUIStore((state) => state.monteCarloStale);
   const clearMonteCarloStale = useUIStore((state) => state.clearMonteCarloStale);
   const whatIf = useUIStore((state) => state.whatIf);
 
   const hasWhatIfActive = whatIf.gameOutcomes.length > 0 || Object.keys(whatIf.ratingAdjustments).length > 0;
+
+  // Use live EV from reactive hook, with distribution EV as fallback
+  const displayEV = liveValue?.expected_value ?? distribution?.expected_value;
 
   const handleResimulate = async () => {
     await refetch();
@@ -152,35 +159,77 @@ export function PortfolioSummary() {
     setNSimulations(Number(e.target.value));
   };
 
-  if (posLoading || distLoading) {
-    return (
-      <div className="bg-white rounded-lg shadow p-6 h-[500px]">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Portfolio Summary</h2>
-        <div className="animate-pulse space-y-3">
-          <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-          <div className="h-[200px] bg-gray-200 rounded"></div>
-          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!distribution) {
-    return (
-      <div className="bg-white rounded-lg shadow p-6 h-[500px]">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Portfolio Summary</h2>
-        <p className="text-gray-500">Failed to load portfolio data</p>
-      </div>
-    );
-  }
-
   const formatValue = (value: number) => value.toFixed(2);
 
+  // Show header with EV even while distribution is loading
+  if (posLoading || (evLoading && !displayEV)) {
+    return (
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h2 className="text-lg font-semibold text-gray-900">Portfolio Summary</h2>
+            <div className="text-2xl font-bold text-gray-400">--</div>
+          </div>
+        </div>
+        {!isCollapsed && (
+          <div className="animate-pulse space-y-3 mt-4">
+            <div className="h-[200px] bg-gray-200 rounded"></div>
+            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (!displayEV && !distribution) {
+    return (
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h2 className="text-lg font-semibold text-gray-900">Portfolio Summary</h2>
+            <div className="text-2xl font-bold text-gray-400">--</div>
+          </div>
+        </div>
+        {!isCollapsed && (
+          <p className="text-gray-500 mt-4">Failed to load portfolio data</p>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-white rounded-lg shadow p-6 h-[500px] flex flex-col">
-      <div className="flex items-center justify-between mb-4 flex-shrink-0">
-        <h2 className="text-lg font-semibold text-gray-900">Portfolio Summary</h2>
+    <div className="bg-white rounded-lg shadow p-6">
+      {/* Header - Always visible with EV */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="flex items-center gap-2 hover:text-gray-600"
+          >
+            <svg
+              className={`w-5 h-5 text-gray-400 transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            <h2 className="text-lg font-semibold text-gray-900">Portfolio Summary</h2>
+          </button>
+          <div className={`text-2xl font-bold text-gray-900 ${evLoading ? 'opacity-50' : ''}`}>
+            EV: {displayEV ? formatValue(displayEV) : '--'}
+          </div>
+        </div>
         <div className="flex items-center gap-2">
+          {monteCarloStale && (
+            <button
+              onClick={handleResimulate}
+              disabled={distLoading}
+              className="px-3 py-1 text-xs font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 rounded disabled:opacity-50"
+            >
+              {distLoading ? 'Simulating...' : 'Re-simulate'}
+            </button>
+          )}
           {hasWhatIfActive && (
             <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
               Scenario Active
@@ -194,84 +243,83 @@ export function PortfolioSummary() {
         </div>
       </div>
 
-      {monteCarloStale && (
-        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
-          <span className="text-sm text-amber-800">
-            Distribution may be outdated due to scenario changes.
-          </span>
-          <button
-            onClick={handleResimulate}
-            disabled={distLoading}
-            className="px-3 py-1 text-sm font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 rounded disabled:opacity-50"
-          >
-            {distLoading ? 'Simulating...' : 'Re-simulate'}
-          </button>
+      {/* Expanded content */}
+      {!isCollapsed && (
+        <div className="mt-4 flex flex-col space-y-4">
+          {monteCarloStale && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <span className="text-sm text-amber-800">
+                Distribution may be outdated due to scenario changes.
+              </span>
+            </div>
+          )}
+
+          {distLoading ? (
+            <div className="animate-pulse space-y-3">
+              <div className="h-[200px] bg-gray-200 rounded"></div>
+              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+            </div>
+          ) : distribution ? (
+            <>
+              {/* Histogram */}
+              <div className="h-[200px]">
+                <DistributionChart distribution={distribution} />
+              </div>
+
+              {/* Percentile Summary */}
+              <div className="pt-2 border-t border-gray-200">
+                <div className="grid grid-cols-5 gap-2 text-center text-xs">
+                  <div>
+                    <div className="font-medium text-red-600">{formatValue(distribution.p1)}</div>
+                    <div className="text-gray-500">p1</div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-orange-600">{formatValue(distribution.p25)}</div>
+                    <div className="text-gray-500">p25</div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-yellow-600">{formatValue(distribution.p50)}</div>
+                    <div className="text-gray-500">p50</div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-green-600">{formatValue(distribution.p75)}</div>
+                    <div className="text-gray-500">p75</div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-green-600">{formatValue(distribution.p99)}</div>
+                    <div className="text-gray-500">p99</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Min/Max and Simulation Settings */}
+              <div className="flex justify-between items-center text-xs text-gray-500">
+                <div className="flex gap-4">
+                  <span>Min: {formatValue(distribution.min_value)}</span>
+                  <span>Max: {formatValue(distribution.max_value)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="simulations" className="text-gray-600">Simulations:</label>
+                  <select
+                    id="simulations"
+                    value={nSimulations}
+                    onChange={handleSimulationsChange}
+                    className="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    {SIMULATION_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="text-gray-500">Distribution not available</p>
+          )}
         </div>
       )}
-
-      <div className="flex-1 flex flex-col space-y-4 overflow-hidden">
-        {/* Expected Value */}
-        <div className="flex-shrink-0">
-          <div className="text-3xl font-bold text-gray-900">
-            {formatValue(distribution.expected_value)}
-          </div>
-          <div className="text-sm text-gray-500">Expected Value</div>
-        </div>
-
-        {/* Histogram */}
-        <div className="flex-1 min-h-0">
-          <DistributionChart distribution={distribution} />
-        </div>
-
-        {/* Percentile Summary */}
-        <div className="flex-shrink-0 pt-2 border-t border-gray-200">
-          <div className="grid grid-cols-5 gap-2 text-center text-xs">
-            <div>
-              <div className="font-medium text-red-600">{formatValue(distribution.p1)}</div>
-              <div className="text-gray-500">p1</div>
-            </div>
-            <div>
-              <div className="font-medium text-orange-600">{formatValue(distribution.p25)}</div>
-              <div className="text-gray-500">p25</div>
-            </div>
-            <div>
-              <div className="font-medium text-yellow-600">{formatValue(distribution.p50)}</div>
-              <div className="text-gray-500">p50</div>
-            </div>
-            <div>
-              <div className="font-medium text-green-600">{formatValue(distribution.p75)}</div>
-              <div className="text-gray-500">p75</div>
-            </div>
-            <div>
-              <div className="font-medium text-green-600">{formatValue(distribution.p99)}</div>
-              <div className="text-gray-500">p99</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Min/Max and Simulation Settings */}
-        <div className="flex-shrink-0 flex justify-between items-center text-xs text-gray-500">
-          <div className="flex gap-4">
-            <span>Min: {formatValue(distribution.min_value)}</span>
-            <span>Max: {formatValue(distribution.max_value)}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <label htmlFor="simulations" className="text-gray-600">Simulations:</label>
-            <select
-              id="simulations"
-              value={nSimulations}
-              onChange={handleSimulationsChange}
-              className="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
-              {SIMULATION_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

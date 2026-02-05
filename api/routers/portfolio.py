@@ -3,6 +3,7 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+import portfolio_value as pv
 from api.models import PositionsResponse, PortfolioSummary, DeltasResponse
 from api.services.portfolio_service import PortfolioService, get_portfolio_service
 from api.services.tournament_service import TournamentService, get_tournament_service, apply_what_if
@@ -21,11 +22,41 @@ def get_positions(
 
 @router.get("/value")
 def get_value(
+    what_if_outcomes: str = Query(default=None, description="JSON-encoded game outcomes"),
+    what_if_adjustments: str = Query(default=None, description="JSON-encoded rating adjustments"),
     portfolio: PortfolioService = Depends(get_portfolio_service),
+    tournament: TournamentService = Depends(get_tournament_service),
 ):
-    """Get current portfolio expected value."""
+    """Get current portfolio expected value.
+
+    This is a cheap probabilistic calculation that can be called frequently.
+    Optionally apply what-if scenarios.
+    """
     try:
-        value = portfolio.get_portfolio_value()
+        # Parse what-if parameters
+        outcomes = []
+        adjustments = {}
+        if what_if_outcomes:
+            try:
+                outcomes = json.loads(what_if_outcomes)
+            except json.JSONDecodeError:
+                pass
+        if what_if_adjustments:
+            try:
+                adjustments = json.loads(what_if_adjustments)
+            except json.JSONDecodeError:
+                pass
+
+        # Get tournament state, optionally with what-if modifications
+        state = tournament.get_state()
+        if outcomes or adjustments:
+            state = apply_what_if(state, game_outcomes=outcomes, rating_adjustments=adjustments)
+
+        # Calculate expected value (cheap probabilistic calculation)
+        positions, _ = portfolio.get_positions()
+        scores = state.calculate_scores_prob()
+        value = pv.get_portfolio_value(positions, scores)
+
         return {"expected_value": value}
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))

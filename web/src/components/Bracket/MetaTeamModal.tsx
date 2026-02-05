@@ -15,6 +15,24 @@ export function MetaTeamModal({ round, position, onClose }: MetaTeamModalProps) 
   const setGameOutcomes = useUIStore((state) => state.setGameOutcomes);
   const { data, isLoading, error } = useSlotCandidates(round, position);
 
+  // Check if a team is in this slot due to what-if selection (100% probability)
+  const selectedTeam = data?.candidates.find((c) => c.probability >= 0.9999);
+
+  // Find what-if outcomes that involve this selected team as winner
+  const relevantOutcomes = selectedTeam
+    ? whatIf.gameOutcomes.filter((o) => o.winner === selectedTeam.team)
+    : [];
+
+  const hasWhatIfSelection = selectedTeam && relevantOutcomes.length > 0;
+
+  const handleClearSelection = () => {
+    // Remove all what-if outcomes where this team is the winner
+    const newOutcomes = whatIf.gameOutcomes.filter(
+      (o) => o.winner !== selectedTeam?.team
+    );
+    setGameOutcomes(newOutcomes);
+  };
+
   const computePathMutation = useMutation({
     mutationFn: (team: string) =>
       analysisApi.computePath({
@@ -92,38 +110,64 @@ export function MetaTeamModal({ round, position, onClose }: MetaTeamModalProps) 
               No teams can reach this slot
             </div>
           ) : (
-            <ul className="space-y-2">
-              {data?.candidates.map((candidate) => (
-                <li key={candidate.team}>
-                  <button
-                    onClick={() => handleSelectTeam(candidate.team)}
-                    disabled={computePathMutation.isPending}
-                    className="w-full flex items-center justify-between p-3 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-colors disabled:opacity-50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="font-medium text-gray-900">
-                        {candidate.team}
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        {(candidate.probability * 100).toFixed(1)}%
-                      </span>
-                    </div>
-                    <span
-                      className={`text-sm font-medium ${
-                        candidate.portfolio_delta > 0
-                          ? 'text-green-600'
-                          : candidate.portfolio_delta < 0
-                          ? 'text-red-600'
-                          : 'text-gray-500'
-                      }`}
-                    >
-                      {candidate.portfolio_delta > 0 ? '+' : ''}
-                      {candidate.portfolio_delta.toFixed(2)}
+            <>
+              {/* What-If Selection Indicator */}
+              {hasWhatIfSelection && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-amber-800">
+                      <span className="font-medium">{selectedTeam.team}</span> is here via what-if
                     </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+                    <button
+                      onClick={handleClearSelection}
+                      className="px-3 py-1.5 text-sm font-medium text-amber-700 bg-amber-100 rounded hover:bg-amber-200"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <ul className="space-y-2">
+                {data?.candidates.map((candidate) => {
+                  const isCurrentSelection = candidate.probability >= 0.9999;
+                  return (
+                    <li key={candidate.team}>
+                      <button
+                        onClick={() => handleSelectTeam(candidate.team)}
+                        disabled={computePathMutation.isPending || isCurrentSelection}
+                        className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors disabled:opacity-50 ${
+                          isCurrentSelection
+                            ? 'border-amber-300 bg-amber-50'
+                            : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="font-medium text-gray-900">
+                            {candidate.team}
+                          </span>
+                          <span className={`text-sm ${isCurrentSelection ? 'text-amber-600 font-medium' : 'text-gray-500'}`}>
+                            {isCurrentSelection ? 'Selected' : `${(candidate.probability * 100).toFixed(1)}%`}
+                          </span>
+                        </div>
+                        <span
+                          className={`text-sm font-medium ${
+                            candidate.portfolio_delta > 0
+                              ? 'text-green-600'
+                              : candidate.portfolio_delta < 0
+                              ? 'text-red-600'
+                              : 'text-gray-500'
+                          }`}
+                        >
+                          {candidate.portfolio_delta > 0 ? '+' : ''}
+                          {candidate.portfolio_delta.toFixed(2)}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )}
         </div>
 

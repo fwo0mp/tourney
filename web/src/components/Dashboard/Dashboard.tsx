@@ -12,6 +12,9 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Portfolio Summary - always visible */}
+      <PortfolioSummary />
+
       {/* View toggle */}
       <div className="flex gap-2">
         <button
@@ -22,7 +25,7 @@ export function Dashboard() {
               : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
           }`}
         >
-          Overview
+          Teams
         </button>
         <button
           onClick={() => setViewMode('bracket')}
@@ -32,7 +35,7 @@ export function Dashboard() {
               : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
           }`}
         >
-          Full Bracket
+          Bracket
         </button>
         <button
           onClick={() => setViewMode('whatif')}
@@ -56,12 +59,7 @@ export function Dashboard() {
         </button>
       </div>
 
-      {viewMode === 'overview' && (
-        <div className="space-y-6">
-          <PortfolioSummary />
-          <TeamsTable />
-        </div>
-      )}
+      {viewMode === 'overview' && <TeamsTable />}
 
       {viewMode === 'bracket' && <BracketView />}
 
