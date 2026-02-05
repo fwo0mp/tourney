@@ -217,3 +217,67 @@ class ScoringConfig(BaseModel):
     round_points: list[float]  # Points per round [round1, round2, ...]
     max_score: float  # Maximum possible score (sum of all round points)
     num_rounds: int  # Number of rounds
+
+
+# Tree-based bracket models
+
+
+class BracketTreeNode(BaseModel):
+    """A node in the tournament bracket tree.
+
+    Each node represents a slot in the bracket where a team can be.
+    Nodes form a binary tree where the winner of each node advances
+    to the parent node.
+    """
+
+    # Identity
+    id: str  # e.g., "south-R0-P5" or "finals-R5-P0"
+    round: int  # -1 for play-in, 0 for first round, 1 for second, etc.
+    position: int  # Position within this round (0-indexed)
+    region: str | None = None  # "south", "east", "midwest", "west", or None for finals
+
+    # Tree relationships (IDs for JSON serialization)
+    parent_id: str | None = None  # Node the winner advances to
+    left_child_id: str | None = None  # Top/higher seed child
+    right_child_id: str | None = None  # Bottom/lower seed child
+
+    # Team data
+    teams: dict[str, float]  # team_name -> probability of being in this slot
+
+    # State flags
+    is_play_in: bool = False
+    is_championship: bool = False
+    is_completed: bool = False  # Has a winner been determined?
+    winner: str | None = None  # Team name if completed
+
+
+class BracketTree(BaseModel):
+    """Complete tournament bracket as a tree structure.
+
+    The tree is stored as a flat dict of nodes for efficient lookup,
+    with explicit parent/child relationships via IDs.
+    """
+
+    # Node storage (flat map for efficient lookup)
+    nodes: dict[str, BracketTreeNode]  # id -> node
+
+    # Entry points
+    root_id: str  # Championship game node
+    leaf_ids: list[str]  # All first-round (or play-in) leaf nodes
+
+    # Metadata
+    num_teams: int
+    num_rounds: int
+    regions: list[str]  # e.g., ["south", "east", "midwest", "west"]
+
+    # Backward compatibility index: maps (round, position) to node_id
+    # Key format: "R{round}-P{position}" e.g., "R0-P5"
+    position_index: dict[str, str]
+
+
+class BracketTreeResponse(BaseModel):
+    """API response containing bracket tree with game state."""
+
+    tree: BracketTree
+    completed_games: list[CompletedGame] = []
+    eliminated_teams: list[str] = []

@@ -3,8 +3,8 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from api.models import TeamInfo, BracketResponse, BracketGame, PlayInGame, CompletedGame, ScoringConfig
-from api.services.tournament_service import TournamentService, get_tournament_service, apply_what_if
+from api.models import TeamInfo, BracketResponse, BracketGame, PlayInGame, CompletedGame, ScoringConfig, BracketTreeResponse
+from api.services.tournament_service import TournamentService, get_tournament_service, apply_what_if, build_bracket_tree_response
 from api.services.portfolio_service import PortfolioService, get_portfolio_service
 from api import database as db
 import portfolio_value as pv
@@ -198,6 +198,30 @@ def get_bracket(
             completed_games=completed_games,
             eliminated_teams=eliminated_teams,
         )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/bracket/tree", response_model=BracketTreeResponse)
+def get_bracket_tree(
+    what_if_outcomes: str = Query(default=None, description="JSON-encoded game outcomes"),
+    what_if_adjustments: str = Query(default=None, description="JSON-encoded rating adjustments"),
+    tournament: TournamentService = Depends(get_tournament_service),
+):
+    """Get bracket as an explicit tree structure.
+
+    Returns a tree representation where each node has explicit parent/child
+    references, eliminating the need for position arithmetic. Play-in games
+    are represented as round -1 nodes.
+    """
+    try:
+        # Apply what-if modifications if provided
+        outcomes, adjustments = parse_what_if_params(what_if_outcomes, what_if_adjustments)
+        state = tournament.get_state()
+        if outcomes or adjustments:
+            state = apply_what_if(state, outcomes, adjustments, tournament.completed_games)
+
+        return build_bracket_tree_response(state, tournament.completed_games)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

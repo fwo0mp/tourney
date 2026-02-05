@@ -1,5 +1,5 @@
 import { api } from './client';
-import type { TeamInfo, BracketResponse, WhatIfState, CompletedGame, ScoringConfig } from '../types';
+import type { TeamInfo, BracketResponse, BracketTreeResponse, WhatIfState, CompletedGame, ScoringConfig } from '../types';
 
 function encodeWhatIfParams(whatIf: WhatIfState | null): string {
   if (!whatIf) return '';
@@ -20,6 +20,8 @@ export const tournamentApi = {
   getTeam: (name: string) => api.get<TeamInfo>(`/tournament/teams/${encodeURIComponent(name)}`),
   getBracket: (whatIf: WhatIfState | null = null) =>
     api.get<BracketResponse>(`/tournament/bracket${encodeWhatIfParams(whatIf)}`),
+  getBracketTree: (whatIf: WhatIfState | null = null) =>
+    api.get<BracketTreeResponse>(`/tournament/bracket/tree${encodeWhatIfParams(whatIf)}`),
   getScores: () => api.get<Record<string, number>>('/tournament/scores'),
   getCompletedGames: () => api.get<CompletedGame[]>('/tournament/completed-games'),
   addCompletedGame: (winner: string, loser: string) =>

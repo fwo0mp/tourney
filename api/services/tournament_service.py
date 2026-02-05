@@ -1,12 +1,13 @@
 """Tournament service for managing tournament state and calculations."""
 
-import os
+import math
 from pathlib import Path
 from typing import Optional
 
 import tourney_utils as tourney
 
 from api import database as db
+from api.models import BracketTree, BracketTreeNode, BracketTreeResponse, CompletedGame
 
 
 class TournamentService:
@@ -388,5 +389,224 @@ def compute_path_to_slot(
     """
     rounds = compute_bracket_rounds(state)
     return compute_path_to_slot_with_rounds(state, rounds, team, target_round, target_position)
+
+
+def _get_region_name(slot_index: int, num_teams: int) -> str | None:
+    """Get region name for a first-round slot based on its index."""
+    if num_teams != 64:
+        return None
+
+    teams_per_region = num_teams // 4
+    if slot_index < teams_per_region:
+        return "south"
+    elif slot_index < 2 * teams_per_region:
+        return "east"
+    elif slot_index < 3 * teams_per_region:
+        return "midwest"
+    else:
+        return "west"
+
+
+def _make_node_id(region: str | None, round_num: int, position: int) -> str:
+    """Create a node ID from region, round, and position."""
+    if region:
+        return f"{region}-R{round_num}-P{position}"
+    else:
+        return f"finals-R{round_num}-P{position}"
+
+
+def build_bracket_tree(
+    state: tourney.TournamentState,
+    completed_games: list[tuple[str, str]] | None = None,
+) -> BracketTree:
+    """Build a tree representation of the tournament bracket.
+
+    Converts the flat bracket structure to an explicit tree with parent/child
+    references. Play-in games (slots with 2 teams in round 0) become round -1 nodes.
+
+    Args:
+        state: The tournament state with bracket and ratings
+        completed_games: List of (winner, loser) tuples for completed games
+
+    Returns:
+        BracketTree with all nodes and relationships
+    """
+    bracket = state.bracket
+    num_teams = len(bracket)
+    num_rounds = int(math.log2(num_teams))
+
+    # Compute all rounds (probabilities propagated through bracket)
+    rounds = compute_bracket_rounds(state)
+
+    # Build set of completed game outcomes for marking winners
+    completed_winners = set()
+    completed_losers = set()
+    if completed_games:
+        for winner, loser in completed_games:
+            completed_winners.add((winner, loser))
+            completed_losers.add(loser)
+
+    nodes: dict[str, BracketTreeNode] = {}
+    leaf_ids: list[str] = []
+    position_index: dict[str, str] = {}
+    regions: list[str] = []
+
+    # Determine regions from first round
+    seen_regions = set()
+    for i in range(num_teams):
+        region = _get_region_name(i, num_teams)
+        if region and region not in seen_regions:
+            seen_regions.add(region)
+            regions.append(region)
+
+    # Build nodes for all rounds
+    for round_num, round_slots in enumerate(rounds):
+        for pos, teams in enumerate(round_slots):
+            # Determine region based on which first-round slots feed into this one
+            # For round R, position P, the first slot is P * 2^R
+            first_slot = pos * (2 ** round_num)
+            region = _get_region_name(first_slot, num_teams) if round_num < num_rounds - 1 else None
+
+            node_id = _make_node_id(region, round_num, pos)
+
+            # Determine if this slot has a winner from completed games
+            is_completed = False
+            winner = None
+            # A slot is completed if one team has 100% probability due to game result
+            if len(teams) == 1:
+                team_name = list(teams.keys())[0]
+                prob = list(teams.values())[0]
+                if prob >= 0.9999:
+                    is_completed = True
+                    winner = team_name
+
+            # Parent ID: in next round at position // 2
+            parent_id = None
+            if round_num < len(rounds) - 1:
+                parent_first_slot = (pos // 2) * (2 ** (round_num + 1))
+                parent_region = _get_region_name(parent_first_slot, num_teams) if round_num + 1 < num_rounds - 1 else None
+                parent_id = _make_node_id(parent_region, round_num + 1, pos // 2)
+
+            # Child IDs: in previous round at positions pos*2 and pos*2+1
+            left_child_id = None
+            right_child_id = None
+            if round_num > 0:
+                child_first_slot = pos * 2 * (2 ** (round_num - 1))
+                child_region = _get_region_name(child_first_slot, num_teams) if round_num - 1 < num_rounds - 1 else None
+                child_region_2 = _get_region_name(child_first_slot + (2 ** (round_num - 1)), num_teams) if round_num - 1 < num_rounds - 1 else None
+                left_child_id = _make_node_id(child_region, round_num - 1, pos * 2)
+                right_child_id = _make_node_id(child_region_2, round_num - 1, pos * 2 + 1)
+
+            node = BracketTreeNode(
+                id=node_id,
+                round=round_num,
+                position=pos,
+                region=region,
+                parent_id=parent_id,
+                left_child_id=left_child_id,
+                right_child_id=right_child_id,
+                teams=dict(teams),
+                is_play_in=False,
+                is_championship=(round_num == len(rounds) - 1),
+                is_completed=is_completed,
+                winner=winner,
+            )
+            nodes[node_id] = node
+            position_index[f"R{round_num}-P{pos}"] = node_id
+
+            # Track leaf nodes (round 0)
+            if round_num == 0:
+                leaf_ids.append(node_id)
+
+    # Handle play-in games: create round -1 nodes for slots with 2 teams
+    play_in_leaf_ids = []
+    for i, game in enumerate(bracket):
+        if len(game) == 2:
+            # This is a play-in game
+            region = _get_region_name(i, num_teams)
+            play_in_id = _make_node_id(region, -1, i)
+
+            # Find winner if completed
+            teams_list = list(game.keys())
+            team1, team2 = teams_list[0], teams_list[1]
+            is_completed = False
+            winner = None
+            if (team1, team2) in completed_winners:
+                is_completed = True
+                winner = team1
+            elif (team2, team1) in completed_winners:
+                is_completed = True
+                winner = team2
+
+            # Parent is the round 0 slot at same position
+            parent_id = _make_node_id(region, 0, i)
+
+            play_in_node = BracketTreeNode(
+                id=play_in_id,
+                round=-1,
+                position=i,
+                region=region,
+                parent_id=parent_id,
+                left_child_id=None,
+                right_child_id=None,
+                teams=dict(game),
+                is_play_in=True,
+                is_championship=False,
+                is_completed=is_completed,
+                winner=winner,
+            )
+            nodes[play_in_id] = play_in_node
+            position_index[f"R-1-P{i}"] = play_in_id
+
+            # Update the round 0 node to point to this play-in as its child
+            round_0_node = nodes.get(parent_id)
+            if round_0_node:
+                # Play-in is treated as a single child (the game itself)
+                round_0_node.left_child_id = play_in_id
+
+            # Play-in nodes are also leaves
+            play_in_leaf_ids.append(play_in_id)
+
+    # Add play-in leaf IDs to the leaf list
+    leaf_ids.extend(play_in_leaf_ids)
+
+    # Root is the championship node
+    root_id = position_index[f"R{len(rounds) - 1}-P0"]
+
+    return BracketTree(
+        nodes=nodes,
+        root_id=root_id,
+        leaf_ids=leaf_ids,
+        num_teams=num_teams,
+        num_rounds=num_rounds,
+        regions=regions,
+        position_index=position_index,
+    )
+
+
+def build_bracket_tree_response(
+    state: tourney.TournamentState,
+    completed_games: list[tuple[str, str]] | None = None,
+) -> BracketTreeResponse:
+    """Build a complete bracket tree response with game state.
+
+    Args:
+        state: The tournament state
+        completed_games: List of (winner, loser) tuples
+
+    Returns:
+        BracketTreeResponse with tree and game state
+    """
+    tree = build_bracket_tree(state, completed_games)
+
+    # Convert completed games to model format
+    completed = [CompletedGame(winner=w, loser=l) for w, l in (completed_games or [])]
+    eliminated = [l for _, l in (completed_games or [])]
+
+    return BracketTreeResponse(
+        tree=tree,
+        completed_games=completed,
+        eliminated_teams=eliminated,
+    )
 
 

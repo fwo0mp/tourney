@@ -39,6 +39,19 @@ export function useBracket() {
   });
 }
 
+/**
+ * Fetch bracket as explicit tree structure.
+ * Provides tree navigation without position arithmetic.
+ */
+export function useBracketTree() {
+  const whatIf = useUIStore((state) => state.whatIf);
+  return useQuery({
+    queryKey: ['tournament', 'bracket-tree', whatIfKey(whatIf)],
+    queryFn: () => tournamentApi.getBracketTree(whatIf),
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useGameImpact(team1: string | null, team2: string | null) {
   return useQuery({
     queryKey: ['analysis', 'game', team1, team2],

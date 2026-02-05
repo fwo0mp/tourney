@@ -196,3 +196,76 @@ export interface ScoringConfig {
   max_score: number;  // Maximum possible score (sum of round points)
   num_rounds: number;
 }
+
+// Tree-based bracket types
+
+/**
+ * A node in the tournament bracket tree.
+ * Each node represents a slot where a team can be.
+ * Nodes form a binary tree where winners advance to parent nodes.
+ */
+export interface BracketTreeNode {
+  // Identity
+  id: string;  // e.g., "south-R0-P5" or "finals-R5-P0"
+  round: number;  // -1 for play-in, 0 for first round, etc.
+  position: number;  // Position within this round (0-indexed)
+  region: string | null;  // "south", "east", etc., or null for finals
+
+  // Tree relationships (IDs for JSON serialization)
+  parent_id: string | null;  // Node the winner advances to
+  left_child_id: string | null;  // Top/higher seed child
+  right_child_id: string | null;  // Bottom/lower seed child
+
+  // Team data
+  teams: Record<string, number>;  // team_name -> probability
+
+  // State flags
+  is_play_in: boolean;
+  is_championship: boolean;
+  is_completed: boolean;  // Has a winner been determined?
+  winner: string | null;  // Team name if completed
+}
+
+/**
+ * Complete tournament bracket as a tree structure.
+ * Stored as a flat dict for efficient lookup with explicit relationships.
+ */
+export interface BracketTree {
+  // Node storage
+  nodes: Record<string, BracketTreeNode>;  // id -> node
+
+  // Entry points
+  root_id: string;  // Championship game node
+  leaf_ids: string[];  // All first-round (or play-in) leaf nodes
+
+  // Metadata
+  num_teams: number;
+  num_rounds: number;
+  regions: string[];  // e.g., ["south", "east", "midwest", "west"]
+
+  // Backward compatibility index
+  // Key format: "R{round}-P{position}" e.g., "R0-P5"
+  position_index: Record<string, string>;  // position key -> node_id
+}
+
+/**
+ * API response containing bracket tree with game state.
+ */
+export interface BracketTreeResponse {
+  tree: BracketTree;
+  completed_games: CompletedGame[];
+  eliminated_teams: string[];
+}
+
+/**
+ * Helper functions for navigating the bracket tree.
+ */
+export interface BracketTreeHelpers {
+  getNode(id: string): BracketTreeNode | undefined;
+  getParent(node: BracketTreeNode): BracketTreeNode | undefined;
+  getLeftChild(node: BracketTreeNode): BracketTreeNode | undefined;
+  getRightChild(node: BracketTreeNode): BracketTreeNode | undefined;
+  getSibling(node: BracketTreeNode): BracketTreeNode | undefined;
+  getPathToRoot(node: BracketTreeNode): BracketTreeNode[];
+  getNodeByPosition(round: number, position: number): BracketTreeNode | undefined;
+}
