@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useGameImpact, useBracket, useAddCompletedGame } from '../../hooks/useTournament';
+import { useGameImpact, useAddCompletedGame } from '../../hooks/useTournament';
 import { useUIStore } from '../../store/uiStore';
 
 type SortColumn = 'team' | 'position' | 'delta_per_share' | 'total_delta';
@@ -12,9 +12,9 @@ interface GamePanelProps {
 
 export function GamePanel({ team1, team2 }: GamePanelProps) {
   const { data: impact, isLoading } = useGameImpact(team1, team2);
-  const { data: bracket } = useBracket();
   const addGameMutation = useAddCompletedGame();
   const selectGame = useUIStore((state) => state.selectGame);
+  const selectedGame = useUIStore((state) => state.selectedGame);
   const selectTeam = useUIStore((state) => state.selectTeam);
   const [sortColumn, setSortColumn] = useState<SortColumn>('total_delta');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -28,9 +28,9 @@ export function GamePanel({ team1, team2 }: GamePanelProps) {
     }
   };
 
-  // Check if both teams are confirmed to play (neither is eliminated)
-  const eliminatedTeams = new Set(bracket?.eliminated_teams || []);
-  const bothTeamsConfirmed = !eliminatedTeams.has(team1) && !eliminatedTeams.has(team2);
+  // Show "Mark Winner" buttons only if both teams are confirmed via completed games
+  // This flag is set by the bracket view when the game box is clicked
+  const canRecordResult = selectedGame?.bothConfirmedFromCompleted ?? false;
 
   const handleMarkWinner = async (winner: string, loser: string) => {
     try {
@@ -122,8 +122,8 @@ export function GamePanel({ team1, team2 }: GamePanelProps) {
               </div>
             </div>
 
-            {/* Mark Winner Buttons - shown when both teams confirmed */}
-            {bothTeamsConfirmed && (
+            {/* Mark Winner Buttons - shown when both teams confirmed via completed games */}
+            {canRecordResult && (
               <div className="border-t border-gray-200 pt-4">
                 <h3 className="text-sm font-medium text-gray-900 mb-3">Record Result</h3>
                 {addGameMutation.isError && (

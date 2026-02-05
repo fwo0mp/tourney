@@ -9,6 +9,7 @@ from api.models import (
     TeamDeltaInfo,
     WhatIfRequest,
     WhatIfResponse,
+    WhatIfStateResponse,
     SlotCandidate,
     SlotCandidatesResponse,
     ComputePathRequest,
@@ -26,6 +27,7 @@ from api.services.portfolio_service import (
     get_portfolio_service,
     get_slot_candidates_with_deltas,
 )
+from api import database as db
 import portfolio_value as pv
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
@@ -206,3 +208,64 @@ def compute_path(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# What-If State Persistence Endpoints
+
+@router.get("/whatif/state", response_model=WhatIfStateResponse)
+def get_whatif_state():
+    """Get persisted what-if state."""
+    game_outcomes = db.get_whatif_game_outcomes()
+    rating_adjustments = db.get_whatif_rating_adjustments()
+
+    return WhatIfStateResponse(
+        game_outcomes=[
+            WhatIfGameOutcome(winner=w, loser=l) for w, l in game_outcomes
+        ],
+        rating_adjustments=rating_adjustments,
+    )
+
+
+@router.post("/whatif/game-outcome")
+def set_whatif_game_outcome(outcome: WhatIfGameOutcome):
+    """Save a what-if game outcome."""
+    db.set_whatif_game_outcome(outcome.winner, outcome.loser)
+    return {"success": True}
+
+
+@router.delete("/whatif/game-outcome")
+def remove_whatif_game_outcome(
+    winner: str = Query(..., description="Winning team name"),
+    loser: str = Query(..., description="Losing team name"),
+):
+    """Remove a what-if game outcome."""
+    removed = db.remove_whatif_game_outcome(winner, loser)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Game outcome not found")
+    return {"success": True}
+
+
+@router.post("/whatif/rating-adjustment")
+def set_whatif_rating_adjustment(
+    team: str = Query(..., description="Team name"),
+    adjustment: float = Query(..., description="Rating adjustment value"),
+):
+    """Save a what-if rating adjustment."""
+    db.set_whatif_rating_adjustment(team, adjustment)
+    return {"success": True}
+
+
+@router.delete("/whatif/rating-adjustment/{team}")
+def remove_whatif_rating_adjustment(team: str):
+    """Remove a what-if rating adjustment."""
+    removed = db.remove_whatif_rating_adjustment(team)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Rating adjustment not found")
+    return {"success": True}
+
+
+@router.delete("/whatif/state")
+def clear_whatif_state():
+    """Clear all what-if state."""
+    db.clear_all_whatif()
+    return {"success": True}

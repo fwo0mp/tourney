@@ -106,6 +106,13 @@ class WhatIfResponse(BaseModel):
     modified_scores: dict[str, float]
 
 
+class WhatIfStateResponse(BaseModel):
+    """Persisted what-if state."""
+
+    game_outcomes: list[WhatIfGameOutcome] = []
+    rating_adjustments: dict[str, float] = {}
+
+
 class BracketGame(BaseModel):
     """A game in the bracket."""
 

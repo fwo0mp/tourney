@@ -36,4 +36,31 @@ export const analysisApi = {
     ),
   computePath: (request: ComputePathRequest) =>
     api.post<ComputePathResponse>('/analysis/compute-path', request),
+
+  // What-If State Persistence
+  getWhatIfState: async (): Promise<WhatIfState> => {
+    const response = await api.get<{
+      game_outcomes: { winner: string; loser: string }[];
+      rating_adjustments: Record<string, number>;
+    }>('/analysis/whatif/state');
+    return {
+      gameOutcomes: response.game_outcomes || [],
+      ratingAdjustments: response.rating_adjustments || {},
+    };
+  },
+  setWhatIfGameOutcome: (winner: string, loser: string) =>
+    api.post<{ success: boolean }>('/analysis/whatif/game-outcome', { winner, loser }),
+  removeWhatIfGameOutcome: (winner: string, loser: string) =>
+    api.delete<{ success: boolean }>(
+      `/analysis/whatif/game-outcome?winner=${encodeURIComponent(winner)}&loser=${encodeURIComponent(loser)}`
+    ),
+  setWhatIfRatingAdjustment: (team: string, adjustment: number) =>
+    api.post<{ success: boolean }>(
+      `/analysis/whatif/rating-adjustment?team=${encodeURIComponent(team)}&adjustment=${adjustment}`,
+      {}
+    ),
+  removeWhatIfRatingAdjustment: (team: string) =>
+    api.delete<{ success: boolean }>(`/analysis/whatif/rating-adjustment/${encodeURIComponent(team)}`),
+  clearWhatIfState: () =>
+    api.delete<{ success: boolean }>('/analysis/whatif/state'),
 };

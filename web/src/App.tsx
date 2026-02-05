@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Dashboard } from './components/Dashboard/Dashboard';
 import { TeamPanel } from './components/TeamPanel/TeamPanel';
@@ -16,6 +17,15 @@ const queryClient = new QueryClient({
 function AppContent() {
   const selectedTeam = useUIStore((state) => state.selectedTeam);
   const selectedGame = useUIStore((state) => state.selectedGame);
+  const initWhatIf = useUIStore((state) => state.initWhatIf);
+  const whatIfLoaded = useUIStore((state) => state.whatIfLoaded);
+
+  // Load persisted what-if state on startup
+  useEffect(() => {
+    if (!whatIfLoaded) {
+      initWhatIf();
+    }
+  }, [initWhatIf, whatIfLoaded]);
 
   const hasSidebar = selectedTeam || selectedGame;
 

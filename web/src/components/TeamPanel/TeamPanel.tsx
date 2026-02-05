@@ -14,10 +14,38 @@ export function TeamPanel({ teamName }: TeamPanelProps) {
   const { data: team, isLoading: teamLoading } = useTeam(teamName);
   const { data: impact, isLoading: impactLoading } = useTeamImpact(teamName);
   const selectTeam = useUIStore((state) => state.selectTeam);
+  const whatIf = useUIStore((state) => state.whatIf);
+  const setRatingAdjustment = useUIStore((state) => state.setRatingAdjustment);
+  const removeRatingAdjustment = useUIStore((state) => state.removeRatingAdjustment);
   const [sortColumn, setSortColumn] = useState<SortColumn>('portfolio_impact');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [adjustmentInput, setAdjustmentInput] = useState<string>('');
 
   const isLoading = teamLoading || impactLoading;
+
+  // Get current rating adjustment for this team (if any)
+  const currentAdjustment = whatIf.ratingAdjustments[teamName] ?? null;
+
+  const handleSetAdjustment = () => {
+    const value = parseFloat(adjustmentInput);
+    if (!isNaN(value) && value !== 0) {
+      setRatingAdjustment(teamName, value);
+      setAdjustmentInput('');
+    }
+  };
+
+  const handleRemoveAdjustment = () => {
+    removeRatingAdjustment(teamName);
+  };
+
+  const handleQuickAdjust = (delta: number) => {
+    const newValue = (currentAdjustment ?? 0) + delta;
+    if (newValue === 0) {
+      removeRatingAdjustment(teamName);
+    } else {
+      setRatingAdjustment(teamName, newValue);
+    }
+  };
 
   const handleSort = (column: SortColumn) => {
     if (column === sortColumn) {
@@ -95,6 +123,83 @@ export function TeamPanel({ teamName }: TeamPanelProps) {
               <div className="text-xs text-gray-500">Portfolio Delta</div>
               <p className="text-xs text-gray-400 mt-1">
                 Portfolio value change per +1 point rating adjustment
+              </p>
+            </div>
+
+            {/* What-If Rating Adjustment */}
+            <div className="border-t border-gray-200 pt-4">
+              <h3 className="text-sm font-medium text-gray-900 mb-3">What-If Rating Adjustment</h3>
+
+              {currentAdjustment !== null ? (
+                <div className="mb-3">
+                  <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <div>
+                      <span className="text-sm text-amber-800">Current adjustment: </span>
+                      <span className={`text-lg font-bold ${currentAdjustment > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {currentAdjustment > 0 ? '+' : ''}{currentAdjustment.toFixed(1)} pts
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleRemoveAdjustment}
+                      className="text-amber-600 hover:text-amber-800 text-sm font-medium"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 mb-3">No adjustment applied</p>
+              )}
+
+              {/* Quick adjustment buttons */}
+              <div className="flex gap-2 mb-3">
+                <button
+                  onClick={() => handleQuickAdjust(-5)}
+                  className="flex-1 px-2 py-1.5 text-sm font-medium bg-red-100 text-red-700 rounded hover:bg-red-200"
+                >
+                  -5
+                </button>
+                <button
+                  onClick={() => handleQuickAdjust(-1)}
+                  className="flex-1 px-2 py-1.5 text-sm font-medium bg-red-50 text-red-600 rounded hover:bg-red-100"
+                >
+                  -1
+                </button>
+                <button
+                  onClick={() => handleQuickAdjust(+1)}
+                  className="flex-1 px-2 py-1.5 text-sm font-medium bg-green-50 text-green-600 rounded hover:bg-green-100"
+                >
+                  +1
+                </button>
+                <button
+                  onClick={() => handleQuickAdjust(+5)}
+                  className="flex-1 px-2 py-1.5 text-sm font-medium bg-green-100 text-green-700 rounded hover:bg-green-200"
+                >
+                  +5
+                </button>
+              </div>
+
+              {/* Custom adjustment input */}
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  step="0.5"
+                  placeholder="Custom adjustment"
+                  value={adjustmentInput}
+                  onChange={(e) => setAdjustmentInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSetAdjustment()}
+                  className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={handleSetAdjustment}
+                  disabled={!adjustmentInput || isNaN(parseFloat(adjustmentInput))}
+                  className="px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Set
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-2">
+                Adjust team rating to see impact on portfolio value
               </p>
             </div>
 

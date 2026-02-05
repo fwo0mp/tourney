@@ -263,34 +263,93 @@ function RegionBracket({
           ((selectedGame.team1 === topSlot.teamName && selectedGame.team2 === bottomSlot.teamName) ||
            (selectedGame.team1 === bottomSlot.teamName && selectedGame.team2 === topSlot.teamName));
 
+        // Round 0 teams aren't from "completed games" in the advancement sense
         gameBoxGroup.append('rect')
           .attr('x', boxX)
           .attr('y', boxY)
           .attr('width', boxWidth)
           .attr('height', boxHeight)
           .attr('rx', 5)
-          .attr('fill', isSelected ? 'rgba(59, 130, 246, 0.1)' : 'transparent')
-          .attr('stroke', isSelected ? '#3b82f6' : '#e5e7eb')
+          .attr('fill', isSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(219, 234, 254, 0.6)')
+          .attr('stroke', isSelected ? '#3b82f6' : '#93c5fd')
           .attr('stroke-width', isSelected ? 2 : 1)
-          .attr('stroke-dasharray', isSelected ? 'none' : '4,2')
           .attr('cursor', 'pointer')
           .on('click', (event: MouseEvent) => {
             event.stopPropagation();
-            selectGame({ team1: topSlot.teamName, team2: bottomSlot.teamName });
+            selectGame({ team1: topSlot.teamName, team2: bottomSlot.teamName, bothConfirmedFromCompleted: true });
           })
           .on('mouseenter', function() {
             d3.select(this)
-              .attr('fill', 'rgba(59, 130, 246, 0.05)')
-              .attr('stroke', '#93c5fd');
+              .attr('fill', 'rgba(59, 130, 246, 0.15)')
+              .attr('stroke', '#3b82f6');
           })
           .on('mouseleave', function() {
             const stillSelected = selectedGame &&
               ((selectedGame.team1 === topSlot.teamName && selectedGame.team2 === bottomSlot.teamName) ||
                (selectedGame.team1 === bottomSlot.teamName && selectedGame.team2 === topSlot.teamName));
             d3.select(this)
-              .attr('fill', stillSelected ? 'rgba(59, 130, 246, 0.1)' : 'transparent')
-              .attr('stroke', stillSelected ? '#3b82f6' : '#e5e7eb');
+              .attr('fill', stillSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(219, 234, 254, 0.6)')
+              .attr('stroke', stillSelected ? '#3b82f6' : '#93c5fd');
           });
+      }
+    }
+
+    // Draw game boxes for later rounds where both teams are known
+    // Round 1: 8 slots -> 4 matchups, Round 2: 4 slots -> 2 matchups, Round 3: 2 slots -> 1 matchup
+    for (let round = 1; round < rounds - 1; round++) {
+      const roundSlots = slots.filter(s => s.round === round);
+      const numMatchups = roundSlots.length / 2;
+
+      for (let matchup = 0; matchup < numMatchups; matchup++) {
+        const topSlot = roundSlots[matchup * 2];
+        const bottomSlot = roundSlots[matchup * 2 + 1];
+
+        // Only draw game box if both teams are known
+        if (topSlot && bottomSlot && topSlot.teamName && bottomSlot.teamName) {
+          const boxX = Math.min(topSlot.x, bottomSlot.x) - gameBoxPadding;
+          const boxY = topSlot.y - gameBoxPadding;
+          const boxWidth = slotWidth + gameBoxPadding * 2;
+          const boxHeight = (bottomSlot.y + slotHeight) - topSlot.y + gameBoxPadding * 2;
+
+          const isSelected = selectedGame &&
+            ((selectedGame.team1 === topSlot.teamName && selectedGame.team2 === bottomSlot.teamName) ||
+             (selectedGame.team1 === bottomSlot.teamName && selectedGame.team2 === topSlot.teamName));
+
+          // Both teams confirmed only if both are from completed games
+          const bothConfirmed = !!topSlot.isFromCompletedGame && !!bottomSlot.isFromCompletedGame;
+
+          gameBoxGroup.append('rect')
+            .attr('x', boxX)
+            .attr('y', boxY)
+            .attr('width', boxWidth)
+            .attr('height', boxHeight)
+            .attr('rx', 5)
+            .attr('fill', isSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(219, 234, 254, 0.6)')  // blue-100 with opacity
+            .attr('stroke', isSelected ? '#3b82f6' : '#93c5fd')  // blue-500 or blue-300
+            .attr('stroke-width', isSelected ? 2 : 1)
+            .attr('cursor', 'pointer')
+            .on('click', (event: MouseEvent) => {
+              event.stopPropagation();
+              selectGame({
+                team1: topSlot.teamName,
+                team2: bottomSlot.teamName,
+                bothConfirmedFromCompleted: bothConfirmed,
+              });
+            })
+            .on('mouseenter', function() {
+              d3.select(this)
+                .attr('fill', 'rgba(59, 130, 246, 0.15)')
+                .attr('stroke', '#3b82f6');
+            })
+            .on('mouseleave', function() {
+              const stillSelected = selectedGame &&
+                ((selectedGame.team1 === topSlot.teamName && selectedGame.team2 === bottomSlot.teamName) ||
+                 (selectedGame.team1 === bottomSlot.teamName && selectedGame.team2 === topSlot.teamName));
+              d3.select(this)
+                .attr('fill', stillSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(219, 234, 254, 0.6)')
+                .attr('stroke', stillSelected ? '#3b82f6' : '#93c5fd');
+            });
+        }
       }
     }
 
@@ -421,17 +480,37 @@ function RegionBracket({
         // Draw game box around both teams
         const boxTop = team1Y - gameBoxPadding;
         const boxBottom = team2Y + slotHeight + gameBoxPadding;
+        const playInSelected = selectedGame &&
+          ((selectedGame.team1 === playIn.team1 && selectedGame.team2 === playIn.team2) ||
+           (selectedGame.team1 === playIn.team2 && selectedGame.team2 === playIn.team1));
+
         playInGroup.append('rect')
           .attr('x', playInX - gameBoxPadding)
           .attr('y', boxTop)
           .attr('width', slotWidth + gameBoxPadding * 2)
           .attr('height', boxBottom - boxTop)
           .attr('rx', 5)
-          .attr('fill', 'none')
-          .attr('stroke', '#9ca3af')
-          .attr('stroke-width', 1)
-          .attr('stroke-dasharray', '4,2')
-          .attr('pointer-events', 'none');
+          .attr('fill', playInSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(219, 234, 254, 0.6)')
+          .attr('stroke', playInSelected ? '#3b82f6' : '#93c5fd')
+          .attr('stroke-width', playInSelected ? 2 : 1)
+          .attr('cursor', 'pointer')
+          .on('click', (event: MouseEvent) => {
+            event.stopPropagation();
+            selectGame({ team1: playIn.team1, team2: playIn.team2, bothConfirmedFromCompleted: true });
+          })
+          .on('mouseenter', function() {
+            d3.select(this)
+              .attr('fill', 'rgba(59, 130, 246, 0.15)')
+              .attr('stroke', '#3b82f6');
+          })
+          .on('mouseleave', function() {
+            const stillSelected = selectedGame &&
+              ((selectedGame.team1 === playIn.team1 && selectedGame.team2 === playIn.team2) ||
+               (selectedGame.team1 === playIn.team2 && selectedGame.team2 === playIn.team1));
+            d3.select(this)
+              .attr('fill', stillSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(219, 234, 254, 0.6)')
+              .attr('stroke', stillSelected ? '#3b82f6' : '#93c5fd');
+          });
 
         // Add "vs" label between the two teams
         const vsY = (team1Y + slotHeight + team2Y) / 2;

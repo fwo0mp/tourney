@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import type { WhatIfGameOutcome, WhatIfState } from '../types';
+import { analysisApi } from '../api/analysis';
 
 interface SelectedGame {
   team1: string;
   team2: string;
+  bothConfirmedFromCompleted?: boolean;  // True if both teams reached this matchup via completed games
 }
 
 interface MetaTeamModal {
@@ -16,6 +18,7 @@ interface UIState {
   selectedGame: SelectedGame | null;
   bracketZoom: number;
   whatIf: WhatIfState;
+  whatIfLoaded: boolean;
   metaTeamModal: MetaTeamModal | null;
   monteCarloStale: boolean;
 
@@ -23,6 +26,7 @@ interface UIState {
   selectTeam: (team: string | null) => void;
   selectGame: (game: SelectedGame | null) => void;
   setBracketZoom: (zoom: number) => void;
+  initWhatIf: () => Promise<void>;
   setGameOutcome: (winner: string, loser: string) => void;
   removeGameOutcome: (winner: string, loser: string) => void;
   setGameOutcomes: (outcomes: WhatIfGameOutcome[]) => void;
@@ -43,6 +47,7 @@ export const useUIStore = create<UIState>((set) => ({
     gameOutcomes: [],
     ratingAdjustments: {},
   },
+  whatIfLoaded: false,
   metaTeamModal: null,
   monteCarloStale: false,
 
@@ -52,7 +57,24 @@ export const useUIStore = create<UIState>((set) => ({
 
   setBracketZoom: (zoom) => set({ bracketZoom: zoom }),
 
-  setGameOutcome: (winner, loser) =>
+  initWhatIf: async () => {
+    try {
+      const state = await analysisApi.getWhatIfState();
+      set({
+        whatIfLoaded: true,
+        whatIf: {
+          gameOutcomes: state.gameOutcomes || [],
+          ratingAdjustments: state.ratingAdjustments || {},
+        },
+      });
+    } catch (e) {
+      console.error('Failed to load what-if state:', e);
+      set({ whatIfLoaded: true });
+    }
+  },
+
+  setGameOutcome: (winner, loser) => {
+    // Update local state
     set((state) => ({
       monteCarloStale: true,
       whatIf: {
@@ -64,9 +86,15 @@ export const useUIStore = create<UIState>((set) => ({
           { winner, loser },
         ],
       },
-    })),
+    }));
+    // Persist to backend
+    analysisApi.setWhatIfGameOutcome(winner, loser).catch((e) =>
+      console.error('Failed to persist game outcome:', e)
+    );
+  },
 
-  removeGameOutcome: (winner, loser) =>
+  removeGameOutcome: (winner, loser) => {
+    // Update local state
     set((state) => ({
       monteCarloStale: true,
       whatIf: {
@@ -75,7 +103,12 @@ export const useUIStore = create<UIState>((set) => ({
           (o) => !(o.winner === winner && o.loser === loser)
         ),
       },
-    })),
+    }));
+    // Persist to backend
+    analysisApi.removeWhatIfGameOutcome(winner, loser).catch((e) =>
+      console.error('Failed to remove game outcome:', e)
+    );
+  },
 
   setGameOutcomes: (outcomes) =>
     set((state) => ({
@@ -86,7 +119,8 @@ export const useUIStore = create<UIState>((set) => ({
       },
     })),
 
-  setRatingAdjustment: (team, delta) =>
+  setRatingAdjustment: (team, delta) => {
+    // Update local state
     set((state) => ({
       monteCarloStale: true,
       whatIf: {
@@ -96,9 +130,15 @@ export const useUIStore = create<UIState>((set) => ({
           [team]: delta,
         },
       },
-    })),
+    }));
+    // Persist to backend
+    analysisApi.setWhatIfRatingAdjustment(team, delta).catch((e) =>
+      console.error('Failed to persist rating adjustment:', e)
+    );
+  },
 
-  removeRatingAdjustment: (team) =>
+  removeRatingAdjustment: (team) => {
+    // Update local state
     set((state) => {
       const { [team]: _, ...rest } = state.whatIf.ratingAdjustments;
       return {
@@ -108,16 +148,27 @@ export const useUIStore = create<UIState>((set) => ({
           ratingAdjustments: rest,
         },
       };
-    }),
+    });
+    // Persist to backend
+    analysisApi.removeWhatIfRatingAdjustment(team).catch((e) =>
+      console.error('Failed to remove rating adjustment:', e)
+    );
+  },
 
-  clearWhatIf: () =>
+  clearWhatIf: () => {
+    // Update local state
     set({
       monteCarloStale: false,
       whatIf: {
         gameOutcomes: [],
         ratingAdjustments: {},
       },
-    }),
+    });
+    // Persist to backend
+    analysisApi.clearWhatIfState().catch((e) =>
+      console.error('Failed to clear what-if state:', e)
+    );
+  },
 
   openMetaTeamModal: (round, position) =>
     set({ metaTeamModal: { round, position } }),
