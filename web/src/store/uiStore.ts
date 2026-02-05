@@ -35,8 +35,8 @@ interface UIState {
   selectGame: (game: SelectedGame | null) => void;
   setBracketZoom: (zoom: number) => void;
   initWhatIf: () => Promise<void>;
-  setGameOutcome: (winner: string, loser: string) => void;
-  removeGameOutcome: (winner: string, loser: string) => void;
+  setGameOutcome: (team1: string, team2: string, probability: number) => void;
+  removeGameOutcome: (team1: string, team2: string) => void;
   setGameOutcomes: (outcomes: WhatIfGameOutcome[]) => void;
   setRatingAdjustment: (team: string, delta: number) => void;
   removeRatingAdjustment: (team: string) => void;
@@ -95,39 +95,48 @@ export const useUIStore = create<UIState>((set) => ({
     }
   },
 
-  setGameOutcome: (winner, loser) => {
+  setGameOutcome: (team1, team2, probability) => {
+    // Normalize to lexicographic order for consistent storage
+    const [t1, t2, prob] = team1 < team2
+      ? [team1, team2, probability]
+      : [team2, team1, 1.0 - probability];
+
     // Update local state
     set((state) => ({
       monteCarloStale: true,
       whatIf: {
         ...state.whatIf,
         gameOutcomes: [
+          // Filter out any existing outcome involving these two teams
           ...state.whatIf.gameOutcomes.filter(
-            (o) => !(o.winner === winner || o.winner === loser || o.loser === winner || o.loser === loser)
+            (o) => !((o.team1 === t1 && o.team2 === t2) || (o.team1 === t2 && o.team2 === t1))
           ),
-          { winner, loser },
+          { team1: t1, team2: t2, probability: prob },
         ],
       },
     }));
     // Persist to backend
-    analysisApi.setWhatIfGameOutcome(winner, loser).catch((e) =>
+    analysisApi.setWhatIfGameOutcome(t1, t2, prob).catch((e) =>
       console.error('Failed to persist game outcome:', e)
     );
   },
 
-  removeGameOutcome: (winner, loser) => {
+  removeGameOutcome: (team1, team2) => {
+    // Normalize to lexicographic order
+    const [t1, t2] = team1 < team2 ? [team1, team2] : [team2, team1];
+
     // Update local state
     set((state) => ({
       monteCarloStale: true,
       whatIf: {
         ...state.whatIf,
         gameOutcomes: state.whatIf.gameOutcomes.filter(
-          (o) => !(o.winner === winner && o.loser === loser)
+          (o) => !(o.team1 === t1 && o.team2 === t2)
         ),
       },
     }));
     // Persist to backend
-    analysisApi.removeWhatIfGameOutcome(winner, loser).catch((e) =>
+    analysisApi.removeWhatIfGameOutcome(t1, t2).catch((e) =>
       console.error('Failed to remove game outcome:', e)
     );
   },

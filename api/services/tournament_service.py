@@ -224,14 +224,21 @@ def apply_what_if(
 
     if game_outcomes:
         for outcome in game_outcomes:
-            winner = outcome.get("winner") or outcome.winner
-            loser = outcome.get("loser") or outcome.loser
+            # Support both dict and object access
+            if hasattr(outcome, 'team1'):
+                team1 = outcome.team1
+                team2 = outcome.team2
+                prob = outcome.probability
+            else:
+                team1 = outcome.get("team1")
+                team2 = outcome.get("team2")
+                prob = outcome.get("probability", 1.0)
 
-            # Skip if winner is already eliminated
-            if winner in eliminated:
+            # Skip if either team is already eliminated
+            if team1 in eliminated or team2 in eliminated:
                 continue
 
-            modified_state = modified_state.with_override(winner, loser, 1.0)
+            modified_state = modified_state.with_override(team1, team2, prob)
 
     if rating_adjustments:
         for team_name, delta in rating_adjustments.items():

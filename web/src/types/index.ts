@@ -96,8 +96,9 @@ export interface DeltasResponse {
 }
 
 export interface WhatIfGameOutcome {
-  winner: string;
-  loser: string;
+  team1: string;
+  team2: string;
+  probability: number; // Probability that team1 wins (0.0 to 1.0)
 }
 
 export interface CompletedGame {

@@ -53,11 +53,28 @@ function getDeltaColor(delta: number, maxDelta: number): string {
   }
 }
 
+// Helper to get winner from an outcome (works with both formats)
+function getOutcomeWinner(
+  outcome: { winner: string; loser: string } | { team1: string; team2: string; probability: number }
+): { winner: string; loser: string } | null {
+  if ('winner' in outcome) {
+    return { winner: outcome.winner, loser: outcome.loser };
+  }
+  // New format: team1/team2/probability
+  if (outcome.probability >= 0.9999) {
+    return { winner: outcome.team1, loser: outcome.team2 };
+  } else if (outcome.probability <= 0.0001) {
+    return { winner: outcome.team2, loser: outcome.team1 };
+  }
+  // Probabilistic outcome - no definite winner
+  return null;
+}
+
 // Build a map of which team is in each slot based on game outcomes
 // Returns Map of "round-slotIndex" -> team name
 function buildSlotMapFromOutcomes(
   games: BracketGame[],
-  outcomes: { winner: string; loser: string }[]
+  outcomes: ({ winner: string; loser: string } | { team1: string; team2: string; probability: number })[]
 ): Map<string, string> {
   const slotMap = new Map<string, string>();
 
@@ -66,10 +83,12 @@ function buildSlotMapFromOutcomes(
   // Create a map of winner -> teams they beat (their "path")
   const winnerBeats = new Map<string, Set<string>>();
   for (const outcome of outcomes) {
-    if (!winnerBeats.has(outcome.winner)) {
-      winnerBeats.set(outcome.winner, new Set());
+    const resolved = getOutcomeWinner(outcome);
+    if (!resolved) continue; // Skip probabilistic outcomes
+    if (!winnerBeats.has(resolved.winner)) {
+      winnerBeats.set(resolved.winner, new Set());
     }
-    winnerBeats.get(outcome.winner)!.add(outcome.loser);
+    winnerBeats.get(resolved.winner)!.add(resolved.loser);
   }
 
   // Create team -> round 0 slot index map
@@ -211,13 +230,19 @@ function RegionBracket({
       if (completedOutcome) {
         playInWinners.set(slotIdx, completedOutcome.winner);
       } else {
-        // Check what-if outcomes
+        // Check what-if outcomes (new format: team1/team2/probability)
         const whatIfOutcome = whatIf.gameOutcomes.find(
-          g => (g.winner === playIn.team1 && g.loser === playIn.team2) ||
-               (g.winner === playIn.team2 && g.loser === playIn.team1)
+          g => {
+            const [t1, t2] = g.team1 < g.team2 ? [g.team1, g.team2] : [g.team2, g.team1];
+            const [p1, p2] = playIn.team1 < playIn.team2 ? [playIn.team1, playIn.team2] : [playIn.team2, playIn.team1];
+            return t1 === p1 && t2 === p2;
+          }
         );
         if (whatIfOutcome) {
-          playInWinners.set(slotIdx, whatIfOutcome.winner);
+          const resolved = getOutcomeWinner(whatIfOutcome);
+          if (resolved) {
+            playInWinners.set(slotIdx, resolved.winner);
+          }
         }
       }
     }

@@ -29,7 +29,8 @@ export function WhatIfTool() {
 
   const handleAddOutcome = () => {
     if (team1 && team2 && team1 !== team2) {
-      setGameOutcome(team1, team2);
+      // Set with probability 1.0 = team1 definitely wins
+      setGameOutcome(team1, team2, 1.0);
       setTeam1('');
       setTeam2('');
     }
@@ -107,24 +108,32 @@ export function WhatIfTool() {
         <div className="mb-6">
           <h4 className="text-xs font-medium text-gray-500 mb-2">Game Outcomes</h4>
           <div className="space-y-1">
-            {whatIf.gameOutcomes.map((outcome, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded text-sm"
-              >
-                <span>
-                  <span className="font-medium text-green-600">{outcome.winner}</span>
-                  {' beats '}
-                  <span className="text-red-600">{outcome.loser}</span>
-                </span>
-                <button
-                  onClick={() => removeGameOutcome(outcome.winner, outcome.loser)}
-                  className="text-gray-400 hover:text-gray-600"
+            {whatIf.gameOutcomes.map((outcome, i) => {
+              // Determine winner/loser from probability
+              const isDefinite = outcome.probability >= 0.9999 || outcome.probability <= 0.0001;
+              const winner = outcome.probability >= 0.5 ? outcome.team1 : outcome.team2;
+              const loser = outcome.probability >= 0.5 ? outcome.team2 : outcome.team1;
+              const winProb = outcome.probability >= 0.5 ? outcome.probability : 1 - outcome.probability;
+
+              return (
+                <div
+                  key={i}
+                  className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded text-sm"
                 >
-                  &times;
-                </button>
-              </div>
-            ))}
+                  <span>
+                    <span className="font-medium text-green-600">{winner}</span>
+                    {isDefinite ? ' beats ' : ` (${(winProb * 100).toFixed(0)}%) vs `}
+                    <span className="text-red-600">{loser}</span>
+                  </span>
+                  <button
+                    onClick={() => removeGameOutcome(outcome.team1, outcome.team2)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    &times;
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

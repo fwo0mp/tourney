@@ -20,13 +20,16 @@ def init_db():
                 UNIQUE(winner, loser)
             )
         """)
+        # Drop old table if it exists (schema change)
+        conn.execute("DROP TABLE IF EXISTS whatif_game_outcomes")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS whatif_game_outcomes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                winner TEXT NOT NULL,
-                loser TEXT NOT NULL,
+                team1 TEXT NOT NULL,
+                team2 TEXT NOT NULL,
+                probability REAL NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(winner, loser)
+                UNIQUE(team1, team2)
             )
         """)
         conn.execute("""
@@ -93,38 +96,55 @@ def clear_completed_games():
 
 
 # What-if game outcomes
-def get_whatif_game_outcomes() -> list[tuple[str, str]]:
-    """Get all what-if game outcomes as (winner, loser) tuples."""
+def get_whatif_game_outcomes() -> list[tuple[str, str, float]]:
+    """Get all what-if game outcomes as (team1, team2, probability) tuples.
+
+    Teams are stored in lexicographic order, probability is for team1 winning.
+    """
     with get_connection() as conn:
         rows = conn.execute(
-            "SELECT winner, loser FROM whatif_game_outcomes ORDER BY id"
+            "SELECT team1, team2, probability FROM whatif_game_outcomes ORDER BY id"
         ).fetchall()
-        return [(row["winner"], row["loser"]) for row in rows]
+        return [(row["team1"], row["team2"], row["probability"]) for row in rows]
 
 
-def set_whatif_game_outcome(winner: str, loser: str) -> bool:
-    """Set a what-if game outcome. Returns True if added/updated."""
+def set_whatif_game_outcome(team1: str, team2: str, probability: float) -> bool:
+    """Set a what-if game outcome with probability.
+
+    Teams are stored in lexicographic order. Probability is for team1 winning.
+    If teams are provided in reverse order, probability is flipped automatically.
+    Returns True if added/updated.
+    """
+    # Normalize to lexicographic order
+    if team1 > team2:
+        team1, team2 = team2, team1
+        probability = 1.0 - probability
+
     with get_connection() as conn:
-        # Remove any existing outcomes involving these teams
+        # Remove any existing outcomes involving these teams (in either order)
         conn.execute(
-            "DELETE FROM whatif_game_outcomes WHERE winner = ? OR winner = ? OR loser = ? OR loser = ?",
-            (winner, loser, winner, loser)
+            "DELETE FROM whatif_game_outcomes WHERE (team1 = ? AND team2 = ?) OR (team1 = ? AND team2 = ?)",
+            (team1, team2, team2, team1)
         )
         # Add the new outcome
         conn.execute(
-            "INSERT INTO whatif_game_outcomes (winner, loser) VALUES (?, ?)",
-            (winner, loser)
+            "INSERT INTO whatif_game_outcomes (team1, team2, probability) VALUES (?, ?, ?)",
+            (team1, team2, probability)
         )
         conn.commit()
         return True
 
 
-def remove_whatif_game_outcome(winner: str, loser: str) -> bool:
+def remove_whatif_game_outcome(team1: str, team2: str) -> bool:
     """Remove a what-if game outcome. Returns True if removed."""
+    # Normalize to lexicographic order
+    if team1 > team2:
+        team1, team2 = team2, team1
+
     with get_connection() as conn:
         cursor = conn.execute(
-            "DELETE FROM whatif_game_outcomes WHERE winner = ? AND loser = ?",
-            (winner, loser)
+            "DELETE FROM whatif_game_outcomes WHERE team1 = ? AND team2 = ?",
+            (team1, team2)
         )
         conn.commit()
         return cursor.rowcount > 0

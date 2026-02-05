@@ -76,10 +76,16 @@ class GameDeltaResponse(BaseModel):
 
 
 class WhatIfGameOutcome(BaseModel):
-    """A game outcome for what-if analysis."""
+    """A game outcome for what-if analysis.
 
-    winner: str
-    loser: str
+    Stores probability that team1 beats team2.
+    Use probability=1.0 to indicate team1 definitely wins.
+    Use probability=0.0 to indicate team2 definitely wins.
+    """
+
+    team1: str
+    team2: str
+    probability: float  # Probability that team1 wins
 
 
 class CompletedGame(BaseModel):

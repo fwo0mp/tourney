@@ -123,10 +123,10 @@ def analyze_what_if(
         # Apply modifications to create new state
         modified_state = original_state
 
-        # Apply game outcome overrides (winner gets 100% probability)
+        # Apply game outcome overrides with probability
         for outcome in request.game_outcomes:
             modified_state = modified_state.with_override(
-                outcome.winner, outcome.loser, 1.0
+                outcome.team1, outcome.team2, outcome.probability
             )
 
         # Apply rating adjustments
@@ -193,15 +193,19 @@ def compute_path(
         # Apply existing outcomes to state
         state = tournament.get_state()
         if request.current_outcomes:
-            outcomes = [{"winner": o.winner, "loser": o.loser} for o in request.current_outcomes]
+            outcomes = [
+                {"team1": o.team1, "team2": o.team2, "probability": o.probability}
+                for o in request.current_outcomes
+            ]
             state = apply_what_if(state, game_outcomes=outcomes)
 
-        # Compute path
+        # Compute path - returns (winner, loser) tuples for definite outcomes
         path = compute_path_to_slot(state, request.team, request.round, request.position)
 
         return ComputePathResponse(
             required_outcomes=[
-                WhatIfGameOutcome(winner=w, loser=l) for w, l in path
+                WhatIfGameOutcome(team1=winner, team2=loser, probability=1.0)
+                for winner, loser in path
             ]
         )
     except FileNotFoundError as e:
@@ -220,7 +224,8 @@ def get_whatif_state():
 
     return WhatIfStateResponse(
         game_outcomes=[
-            WhatIfGameOutcome(winner=w, loser=l) for w, l in game_outcomes
+            WhatIfGameOutcome(team1=t1, team2=t2, probability=prob)
+            for t1, t2, prob in game_outcomes
         ],
         rating_adjustments=rating_adjustments,
     )
@@ -228,18 +233,18 @@ def get_whatif_state():
 
 @router.post("/whatif/game-outcome")
 def set_whatif_game_outcome(outcome: WhatIfGameOutcome):
-    """Save a what-if game outcome."""
-    db.set_whatif_game_outcome(outcome.winner, outcome.loser)
+    """Save a what-if game outcome with probability."""
+    db.set_whatif_game_outcome(outcome.team1, outcome.team2, outcome.probability)
     return {"success": True}
 
 
 @router.delete("/whatif/game-outcome")
 def remove_whatif_game_outcome(
-    winner: str = Query(..., description="Winning team name"),
-    loser: str = Query(..., description="Losing team name"),
+    team1: str = Query(..., description="First team name"),
+    team2: str = Query(..., description="Second team name"),
 ):
     """Remove a what-if game outcome."""
-    removed = db.remove_whatif_game_outcome(winner, loser)
+    removed = db.remove_whatif_game_outcome(team1, team2)
     if not removed:
         raise HTTPException(status_code=404, detail="Game outcome not found")
     return {"success": True}

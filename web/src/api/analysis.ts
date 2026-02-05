@@ -40,7 +40,7 @@ export const analysisApi = {
   // What-If State Persistence
   getWhatIfState: async (): Promise<WhatIfState> => {
     const response = await api.get<{
-      game_outcomes: { winner: string; loser: string }[];
+      game_outcomes: { team1: string; team2: string; probability: number }[];
       rating_adjustments: Record<string, number>;
     }>('/analysis/whatif/state');
     return {
@@ -48,11 +48,11 @@ export const analysisApi = {
       ratingAdjustments: response.rating_adjustments || {},
     };
   },
-  setWhatIfGameOutcome: (winner: string, loser: string) =>
-    api.post<{ success: boolean }>('/analysis/whatif/game-outcome', { winner, loser }),
-  removeWhatIfGameOutcome: (winner: string, loser: string) =>
+  setWhatIfGameOutcome: (team1: string, team2: string, probability: number) =>
+    api.post<{ success: boolean }>('/analysis/whatif/game-outcome', { team1, team2, probability }),
+  removeWhatIfGameOutcome: (team1: string, team2: string) =>
     api.delete<{ success: boolean }>(
-      `/analysis/whatif/game-outcome?winner=${encodeURIComponent(winner)}&loser=${encodeURIComponent(loser)}`
+      `/analysis/whatif/game-outcome?team1=${encodeURIComponent(team1)}&team2=${encodeURIComponent(team2)}`
     ),
   setWhatIfRatingAdjustment: (team: string, adjustment: number) =>
     api.post<{ success: boolean }>(
