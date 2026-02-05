@@ -1,18 +1,41 @@
 import { useMutation } from '@tanstack/react-query';
-import { useSlotCandidates } from '../../hooks/useTournament';
+import { useMemo } from 'react';
+import { useSlotCandidates, useBracketTree } from '../../hooks/useTournament';
 import { useUIStore } from '../../store/uiStore';
 import { analysisApi } from '../../api/analysis';
+import { createBracketTreeHelpers, parsePositionKey } from '../../utils/bracketTree';
 import type { WhatIfGameOutcome } from '../../types';
 
 interface MetaTeamModalProps {
-  round: number;
-  position: number;
+  nodeId: string;
   onClose: () => void;
 }
 
-export function MetaTeamModal({ round, position, onClose }: MetaTeamModalProps) {
+export function MetaTeamModal({ nodeId, onClose }: MetaTeamModalProps) {
   const whatIf = useUIStore((state) => state.whatIf);
   const setGameOutcomes = useUIStore((state) => state.setGameOutcomes);
+  const { data: treeResponse } = useBracketTree();
+
+  // Parse round/position from nodeId for API compatibility
+  const parsed = useMemo(() => parsePositionKey(nodeId), [nodeId]);
+  const round = parsed?.round ?? 0;
+  const position = parsed?.position ?? 0;
+
+  // Get node info from tree
+  const node = useMemo(() => {
+    if (!treeResponse?.tree) {
+      return null;
+    }
+    const helpers = createBracketTreeHelpers(treeResponse.tree);
+    // Try to find node by ID first, then by position index
+    let foundNode = helpers.getNode(nodeId);
+    if (!foundNode && parsed) {
+      foundNode = helpers.getNodeByPosition(parsed.round, parsed.position);
+    }
+    return foundNode;
+  }, [treeResponse, nodeId, parsed]);
+
+  // Use slot candidates API (still uses round/position)
   const { data, isLoading, error } = useSlotCandidates(round, position);
 
   // Check if a team is in this slot due to what-if selection (100% probability)
@@ -76,6 +99,20 @@ export function MetaTeamModal({ round, position, onClose }: MetaTeamModalProps) 
     }
   };
 
+  // Build display label from node info or fall back to round/position
+  const displayLabel = useMemo(() => {
+    if (node) {
+      const roundName = node.is_play_in
+        ? 'Play-In'
+        : node.is_championship
+        ? 'Championship'
+        : `Round ${node.round + 1}`;
+      const regionLabel = node.region ? `${node.region.charAt(0).toUpperCase() + node.region.slice(1)} ` : '';
+      return `${regionLabel}${roundName}, Position ${node.position + 1}`;
+    }
+    return `Round ${round + 1}, Position ${position + 1}`;
+  }, [node, round, position]);
+
   return (
     <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
@@ -92,7 +129,7 @@ export function MetaTeamModal({ round, position, onClose }: MetaTeamModalProps) 
             Select Team for This Slot
           </h2>
           <p className="text-sm text-gray-500 mt-1">
-            Round {round + 1}, Position {position + 1}
+            {displayLabel}
           </p>
         </div>
 

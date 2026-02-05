@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import { useTeams, useBracket } from '../../hooks/useTournament';
 import { useUIStore } from '../../store/uiStore';
 import { MetaTeamModal } from './MetaTeamModal';
+import { makePositionKey } from '../../utils/bracketTree';
 import type { TeamInfo, BracketGame, PlayInGame, CompletedGame } from '../../types';
 
 type BracketViewType = 'overall' | 'region1' | 'region2' | 'region3' | 'region4' | 'sweet16';
@@ -189,9 +190,6 @@ function RegionBracket({
 
     // Create a set of slot indices that have play-in games
     const playInSlotIndices = new Set(playInGames.map(p => p.slot_index % 16));
-
-    // Create a map of slot index -> play-in game for quick lookup
-    const playInBySlot = new Map(playInGames.map(p => [p.slot_index % 16, p]));
 
     // Build a map of play-in game outcomes from completed games and what-if
     // Key: slot index, Value: winner team name
@@ -708,7 +706,7 @@ function RegionBracket({
           event.stopPropagation();
           if (isPlayInSlot) {
             // For play-in slots, open modal to show both candidates
-            openMetaTeamModal(0, globalPosition);
+            openMetaTeamModal(makePositionKey(0, globalPosition));
           } else if (slot.teamName) {
             selectTeam(slot.teamName);
           }
@@ -803,7 +801,7 @@ function RegionBracket({
               selectTeam(slot.teamName);
             } else {
               // Team is here via what-if - allow changing via meta team modal
-              openMetaTeamModal(globalRound, globalPosition);
+              openMetaTeamModal(makePositionKey(globalRound, globalPosition));
             }
           })
           .on('dblclick', (event: MouseEvent) => {
@@ -869,7 +867,7 @@ function RegionBracket({
           .attr('cursor', 'pointer')
           .on('click', (event: MouseEvent) => {
             event.stopPropagation();
-            openMetaTeamModal(globalRound, globalPosition);
+            openMetaTeamModal(makePositionKey(globalRound, globalPosition));
           });
 
         group.append('rect')
@@ -1456,8 +1454,7 @@ export function BracketView() {
 
       {metaTeamModal && (
         <MetaTeamModal
-          round={metaTeamModal.round}
-          position={metaTeamModal.position}
+          nodeId={metaTeamModal.nodeId}
           onClose={closeMetaTeamModal}
         />
       )}

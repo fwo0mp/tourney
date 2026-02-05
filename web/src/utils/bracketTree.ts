@@ -8,6 +8,31 @@
 import type { BracketTree, BracketTreeNode, BracketTreeHelpers } from '../types';
 
 /**
+ * Create a position index key from round and position.
+ * This is the standard format used for looking up nodes: "R{round}-P{position}"
+ */
+export function makePositionKey(round: number, position: number): string {
+  return `R${round}-P${position}`;
+}
+
+/**
+ * Parse round and position from a nodeId or position index key.
+ * Supports formats: "south-R0-P5", "R0-P5", "R-1-P9" (play-in)
+ * Returns null if the format is not recognized.
+ */
+export function parsePositionKey(nodeId: string): { round: number; position: number } | null {
+  // Match R{round}-P{position} pattern anywhere in the string
+  const match = nodeId.match(/R(-?\d+)-P(\d+)/);
+  if (match) {
+    return {
+      round: parseInt(match[1], 10),
+      position: parseInt(match[2], 10),
+    };
+  }
+  return null;
+}
+
+/**
  * Create helper functions for navigating a bracket tree.
  *
  * @param tree The bracket tree to navigate

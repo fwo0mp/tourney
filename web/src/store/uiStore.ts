@@ -9,8 +9,10 @@ interface SelectedGame {
 }
 
 interface MetaTeamModal {
-  round: number;
-  position: number;
+  nodeId: string;
+  // Deprecated: kept for backward compatibility during migration
+  round?: number;
+  position?: number;
 }
 
 interface UIState {
@@ -39,7 +41,9 @@ interface UIState {
   setRatingAdjustment: (team: string, delta: number) => void;
   removeRatingAdjustment: (team: string) => void;
   clearWhatIf: () => void;
-  openMetaTeamModal: (round: number, position: number) => void;
+  openMetaTeamModal: (nodeId: string) => void;
+  // Deprecated: use openMetaTeamModal with nodeId instead
+  openMetaTeamModalLegacy: (round: number, position: number) => void;
   closeMetaTeamModal: () => void;
   markMonteCarloStale: () => void;
   clearMonteCarloStale: () => void;
@@ -188,8 +192,12 @@ export const useUIStore = create<UIState>((set) => ({
     );
   },
 
-  openMetaTeamModal: (round, position) =>
-    set({ metaTeamModal: { round, position } }),
+  openMetaTeamModal: (nodeId) =>
+    set({ metaTeamModal: { nodeId } }),
+
+  // Deprecated: use openMetaTeamModal with nodeId instead
+  openMetaTeamModalLegacy: (round, position) =>
+    set({ metaTeamModal: { nodeId: `R${round}-P${position}`, round, position } }),
 
   closeMetaTeamModal: () =>
     set({ metaTeamModal: null }),
