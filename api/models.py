@@ -149,6 +149,7 @@ class PositionsResponse(BaseModel):
     """Current portfolio positions."""
 
     positions: dict[str, float]
+    cash_balance: float
     is_mock: bool
 
 
@@ -188,3 +189,31 @@ class ComputePathResponse(BaseModel):
     """Response with required game outcomes for team to reach slot."""
 
     required_outcomes: list[WhatIfGameOutcome]
+
+
+class HypotheticalValueRequest(BaseModel):
+    """Request for hypothetical portfolio value calculation."""
+
+    position_changes: dict[str, float]  # team name -> quantity change (+/-)
+
+
+class HypotheticalValueResponse(BaseModel):
+    """Response for hypothetical portfolio value calculation."""
+
+    current_value: float
+    hypothetical_value: float
+    delta: float
+    hypothetical_positions: dict[str, float]
+    # Cash balance info (unchanged by position changes, but useful for display)
+    current_cash: float
+    # Total portfolio value including cash
+    current_total: float  # current_value + current_cash
+    hypothetical_total: float  # hypothetical_value + current_cash (trade cost not included here)
+
+
+class ScoringConfig(BaseModel):
+    """Tournament scoring configuration."""
+
+    round_points: list[float]  # Points per round [round1, round2, ...]
+    max_score: float  # Maximum possible score (sum of all round points)
+    num_rounds: int  # Number of rounds

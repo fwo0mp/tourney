@@ -141,6 +141,7 @@ function RegionBracket({
   const svgRef = useRef<SVGSVGElement>(null);
   const selectTeam = useUIStore((state) => state.selectTeam);
   const selectGame = useUIStore((state) => state.selectGame);
+  const navigateToDetailedView = useUIStore((state) => state.navigateToDetailedView);
   const selectedTeam = useUIStore((state) => state.selectedTeam);
   const selectedGame = useUIStore((state) => state.selectedGame);
   const openMetaTeamModal = useUIStore((state) => state.openMetaTeamModal);
@@ -392,6 +393,11 @@ function RegionBracket({
           .on('click', (event: MouseEvent) => {
             event.stopPropagation();
             selectTeam(playIn.team1);
+          })
+          .on('dblclick', (event: MouseEvent) => {
+            event.stopPropagation();
+            event.preventDefault();
+            navigateToDetailedView(playIn.team1);
           });
 
         // Determine team 1 stroke
@@ -439,6 +445,11 @@ function RegionBracket({
           .on('click', (event: MouseEvent) => {
             event.stopPropagation();
             selectTeam(playIn.team2);
+          })
+          .on('dblclick', (event: MouseEvent) => {
+            event.stopPropagation();
+            event.preventDefault();
+            navigateToDetailedView(playIn.team2);
           });
 
         // Determine team 2 stroke
@@ -653,6 +664,13 @@ function RegionBracket({
           } else {
             selectTeam(slot.teamName);
           }
+        })
+        .on('dblclick', (event: MouseEvent) => {
+          event.stopPropagation();
+          event.preventDefault();
+          if (!isPlayInSlot && slot.teamName) {
+            navigateToDetailedView(slot.teamName);
+          }
         });
 
       const delta = slot.teamInfo?.delta || 0;
@@ -718,6 +736,13 @@ function RegionBracket({
             } else {
               // Team is here via what-if - allow changing via meta team modal
               openMetaTeamModal(globalRound, globalPosition);
+            }
+          })
+          .on('dblclick', (event: MouseEvent) => {
+            event.stopPropagation();
+            event.preventDefault();
+            if (slot.teamName) {
+              navigateToDetailedView(slot.teamName);
             }
           });
 
@@ -830,6 +855,7 @@ function Sweet16Bracket({
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const selectTeam = useUIStore((state) => state.selectTeam);
+  const navigateToDetailedView = useUIStore((state) => state.navigateToDetailedView);
   const selectedTeam = useUIStore((state) => state.selectedTeam);
 
   useEffect(() => {
@@ -1047,7 +1073,14 @@ function Sweet16Bracket({
       const group = slotGroup.append('g')
         .attr('transform', `translate(${slot.x}, ${slot.y})`)
         .attr('cursor', 'pointer')
-        .on('click', () => selectTeam(slot.teamName));
+        .on('click', () => selectTeam(slot.teamName))
+        .on('dblclick', (event: MouseEvent) => {
+          event.stopPropagation();
+          event.preventDefault();
+          if (slot.teamName) {
+            navigateToDetailedView(slot.teamName);
+          }
+        });
 
       const delta = slot.teamInfo?.delta || 0;
 

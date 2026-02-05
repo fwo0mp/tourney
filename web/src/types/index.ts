@@ -86,6 +86,7 @@ export interface BracketResponse {
 
 export interface PositionsResponse {
   positions: Record<string, number>;
+  cash_balance: number;
   is_mock: boolean;
 }
 
@@ -156,4 +157,42 @@ export interface ComputePathResponse {
 export interface WhatIfState {
   gameOutcomes: WhatIfGameOutcome[];
   ratingAdjustments: Record<string, number>;
+}
+
+// View modes for Dashboard tabs
+export type ViewMode = 'overview' | 'bracket' | 'whatif' | 'completed' | 'teamdetail';
+
+// Hypothetical trade for exploring potential trades
+export interface HypotheticalTrade {
+  team: string;
+  direction: 'buy' | 'sell';
+  quantity: number;
+  price: number;
+}
+
+// Response from hypothetical value calculation
+export interface HypotheticalValueResponse {
+  current_value: number;
+  hypothetical_value: number;
+  delta: number;
+  hypothetical_positions: Record<string, number>;
+  // Cash balance info
+  current_cash: number;
+  // Total portfolio value including cash
+  current_total: number;  // current_value + current_cash
+  hypothetical_total: number;  // hypothetical_value + current_cash (trade cost not applied)
+}
+
+// Response from /portfolio/value endpoint
+export interface PortfolioValueResponse {
+  expected_value: number;
+  cash_balance: number;
+  total_value: number;
+}
+
+// Scoring configuration from /tournament/scoring
+export interface ScoringConfig {
+  round_points: number[];  // Points per round
+  max_score: number;  // Maximum possible score (sum of round points)
+  num_rounds: number;
 }

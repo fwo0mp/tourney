@@ -3,11 +3,12 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from api.models import TeamInfo, BracketResponse, BracketGame, PlayInGame, CompletedGame
+from api.models import TeamInfo, BracketResponse, BracketGame, PlayInGame, CompletedGame, ScoringConfig
 from api.services.tournament_service import TournamentService, get_tournament_service, apply_what_if
 from api.services.portfolio_service import PortfolioService, get_portfolio_service
 from api import database as db
 import portfolio_value as pv
+import tourney_utils as tourney
 
 router = APIRouter(prefix="/tournament", tags=["tournament"])
 
@@ -210,6 +211,26 @@ def get_scores(
         return tournament.get_scores()
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/scoring", response_model=ScoringConfig)
+def get_scoring_config():
+    """Get tournament scoring configuration.
+
+    Returns the points awarded per round and the maximum possible score.
+    In mock mode, uses default ROUND_POINTS. When connected to CIX,
+    this will fetch the actual scoring configuration from the market.
+    """
+    # TODO: When CIX integration is complete, fetch from CIX API if available
+    # For now, always use the default ROUND_POINTS
+    round_points = list(tourney.ROUND_POINTS)
+    max_score = sum(round_points)
+
+    return ScoringConfig(
+        round_points=round_points,
+        max_score=max_score,
+        num_rounds=len(round_points),
+    )
 
 
 @router.get("/completed-games", response_model=list[CompletedGame])

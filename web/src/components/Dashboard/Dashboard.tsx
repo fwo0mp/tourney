@@ -1,14 +1,14 @@
-import { useState } from 'react';
 import { PortfolioSummary } from './PortfolioSummary';
 import { TeamsTable } from './TeamsTable';
 import { BracketView } from '../Bracket/BracketView';
 import { WhatIfTool } from '../WhatIf';
 import { CompletedGamesView } from '../CompletedGames';
-
-type ViewMode = 'overview' | 'bracket' | 'whatif' | 'completed';
+import { TeamDetailView } from '../TeamDetail';
+import { useUIStore } from '../../store/uiStore';
 
 export function Dashboard() {
-  const [viewMode, setViewMode] = useState<ViewMode>('overview');
+  const viewMode = useUIStore((state) => state.viewMode);
+  const setViewMode = useUIStore((state) => state.setViewMode);
 
   return (
     <div className="space-y-6">
@@ -57,6 +57,16 @@ export function Dashboard() {
         >
           Completed Games
         </button>
+        <button
+          onClick={() => setViewMode('teamdetail')}
+          className={`px-4 py-2 text-sm font-medium rounded-lg ${
+            viewMode === 'teamdetail'
+              ? 'bg-blue-600 text-white'
+              : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+          }`}
+        >
+          Team Detail
+        </button>
       </div>
 
       {viewMode === 'overview' && <TeamsTable />}
@@ -87,6 +97,8 @@ export function Dashboard() {
       )}
 
       {viewMode === 'completed' && <CompletedGamesView />}
+
+      {viewMode === 'teamdetail' && <TeamDetailView />}
     </div>
   );
 }

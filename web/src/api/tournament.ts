@@ -1,5 +1,5 @@
 import { api } from './client';
-import type { TeamInfo, BracketResponse, WhatIfState, CompletedGame } from '../types';
+import type { TeamInfo, BracketResponse, WhatIfState, CompletedGame, ScoringConfig } from '../types';
 
 function encodeWhatIfParams(whatIf: WhatIfState | null): string {
   if (!whatIf) return '';
@@ -28,4 +28,5 @@ export const tournamentApi = {
     api.delete<{ success: boolean }>(
       `/tournament/completed-games?winner=${encodeURIComponent(winner)}&loser=${encodeURIComponent(loser)}`
     ),
+  getScoringConfig: () => api.get<ScoringConfig>('/tournament/scoring'),
 };

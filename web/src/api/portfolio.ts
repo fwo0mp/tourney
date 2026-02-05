@@ -1,5 +1,12 @@
 import { api } from './client';
-import type { PositionsResponse, PortfolioSummary, DeltasResponse, WhatIfState } from '../types';
+import type {
+  PositionsResponse,
+  PortfolioSummary,
+  DeltasResponse,
+  WhatIfState,
+  HypotheticalValueResponse,
+  PortfolioValueResponse,
+} from '../types';
 
 export const portfolioApi = {
   getPositions: () => api.get<PositionsResponse>('/portfolio/positions'),
@@ -12,7 +19,7 @@ export const portfolioApi = {
       params.set('what_if_adjustments', JSON.stringify(whatIf.ratingAdjustments));
     }
     const queryString = params.toString();
-    return api.get<{ expected_value: number }>(`/portfolio/value${queryString ? `?${queryString}` : ''}`);
+    return api.get<PortfolioValueResponse>(`/portfolio/value${queryString ? `?${queryString}` : ''}`);
   },
   getDistribution: (nSimulations = 10000, whatIf?: WhatIfState) => {
     const params = new URLSearchParams();
@@ -38,4 +45,19 @@ export const portfolioApi = {
         portfolio_impact: number;
       }>;
     }>(`/portfolio/team/${encodeURIComponent(teamName)}/impact?point_delta=${pointDelta}`),
+
+  getHypotheticalValue: (positionChanges: Record<string, number>, whatIf?: WhatIfState) => {
+    const params = new URLSearchParams();
+    if (whatIf && whatIf.gameOutcomes.length > 0) {
+      params.set('what_if_outcomes', JSON.stringify(whatIf.gameOutcomes));
+    }
+    if (whatIf && Object.keys(whatIf.ratingAdjustments).length > 0) {
+      params.set('what_if_adjustments', JSON.stringify(whatIf.ratingAdjustments));
+    }
+    const queryString = params.toString();
+    return api.post<HypotheticalValueResponse>(
+      `/portfolio/hypothetical-value${queryString ? `?${queryString}` : ''}`,
+      { position_changes: positionChanges }
+    );
+  },
 };

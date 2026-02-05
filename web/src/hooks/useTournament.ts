@@ -93,3 +93,11 @@ export function useRemoveCompletedGame() {
     },
   });
 }
+
+export function useScoringConfig() {
+  return useQuery({
+    queryKey: ['tournament', 'scoring'],
+    queryFn: () => tournamentApi.getScoringConfig(),
+    staleTime: Infinity, // Scoring config rarely changes
+  });
+}

@@ -14,6 +14,7 @@ export function TeamPanel({ teamName }: TeamPanelProps) {
   const { data: team, isLoading: teamLoading } = useTeam(teamName);
   const { data: impact, isLoading: impactLoading } = useTeamImpact(teamName);
   const selectTeam = useUIStore((state) => state.selectTeam);
+  const navigateToDetailedView = useUIStore((state) => state.navigateToDetailedView);
   const whatIf = useUIStore((state) => state.whatIf);
   const setRatingAdjustment = useUIStore((state) => state.setRatingAdjustment);
   const removeRatingAdjustment = useUIStore((state) => state.removeRatingAdjustment);
@@ -83,14 +84,22 @@ export function TeamPanel({ teamName }: TeamPanelProps) {
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-gray-900">{teamName}</h2>
-          <button
-            onClick={() => selectTeam(null)}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigateToDetailedView(teamName)}
+              className="px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              View Details
+            </button>
+            <button
+              onClick={() => selectTeam(null)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {isLoading ? (

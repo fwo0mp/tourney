@@ -199,7 +199,7 @@ export function PortfolioSummary() {
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      {/* Header - Always visible with EV */}
+      {/* Header - Always visible with EV and Cash */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
@@ -216,8 +216,21 @@ export function PortfolioSummary() {
             </svg>
             <h2 className="text-lg font-semibold text-gray-900">Portfolio Summary</h2>
           </button>
-          <div className={`text-2xl font-bold text-gray-900 ${evLoading ? 'opacity-50' : ''}`}>
-            EV: {displayEV ? formatValue(displayEV) : '--'}
+          <div className={`flex items-center gap-4 ${evLoading ? 'opacity-50' : ''}`}>
+            <div>
+              <span className="text-sm text-gray-500">Team EV:</span>
+              <span className="text-2xl font-bold text-gray-900 ml-1">{displayEV ? formatValue(displayEV) : '--'}</span>
+            </div>
+            <div className="text-gray-300">|</div>
+            <div>
+              <span className="text-sm text-gray-500">Cash:</span>
+              <span className="text-xl font-semibold text-gray-700 ml-1">${liveValue?.cash_balance?.toFixed(2) ?? '--'}</span>
+            </div>
+            <div className="text-gray-300">|</div>
+            <div>
+              <span className="text-sm text-gray-500">Total EV:</span>
+              <span className="text-xl font-semibold text-blue-600 ml-1">${liveValue?.total_value?.toFixed(2) ?? '--'}</span>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">

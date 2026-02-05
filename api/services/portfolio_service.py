@@ -32,6 +32,9 @@ MOCK_POSITIONS = {
     "Texas": 2.0,
 }
 
+# Mock cash balance for development/demo mode
+MOCK_CASH_BALANCE = 2500.0
+
 
 class PortfolioService:
     """Service for portfolio calculations."""
@@ -78,6 +81,28 @@ class PortfolioService:
 
         # Fallback to mock if CIX unavailable
         return MOCK_POSITIONS.copy(), True
+
+    def get_cash_balance(self) -> tuple[float, bool]:
+        """Get current cash balance. Returns (cash_balance, is_mock).
+
+        Cash balance has zero delta - it doesn't change with team ratings.
+        """
+        if self._use_mock:
+            return MOCK_CASH_BALANCE, True
+
+        client = self._get_cix_client()
+        if client:
+            try:
+                # CIX API will provide cash balance in the future
+                # For now, try to get it from portfolio summary if available
+                portfolio = client.my_portfolio()
+                if hasattr(portfolio, 'cash') and portfolio.cash is not None:
+                    return float(portfolio.cash), False
+            except Exception:
+                pass
+
+        # Fallback to mock if CIX unavailable
+        return MOCK_CASH_BALANCE, True
 
     def get_portfolio_value(self, positions: dict = None) -> float:
         """Calculate current portfolio expected value."""

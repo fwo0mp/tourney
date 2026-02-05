@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { WhatIfGameOutcome, WhatIfState } from '../types';
+import type { WhatIfGameOutcome, WhatIfState, ViewMode, HypotheticalTrade } from '../types';
 import { analysisApi } from '../api/analysis';
 
 interface SelectedGame {
@@ -21,6 +21,12 @@ interface UIState {
   whatIfLoaded: boolean;
   metaTeamModal: MetaTeamModal | null;
   monteCarloStale: boolean;
+  // View mode for Dashboard tabs (moved from Dashboard local state)
+  viewMode: ViewMode;
+  // Team selected for detailed view (separate from sidebar selectedTeam)
+  detailedViewTeam: string | null;
+  // Hypothetical trade for exploration (not persisted)
+  hypotheticalTrade: HypotheticalTrade | null;
 
   // Actions
   selectTeam: (team: string | null) => void;
@@ -37,6 +43,15 @@ interface UIState {
   closeMetaTeamModal: () => void;
   markMonteCarloStale: () => void;
   clearMonteCarloStale: () => void;
+  // View mode actions
+  setViewMode: (mode: ViewMode) => void;
+  // Detailed view actions
+  setDetailedViewTeam: (team: string | null) => void;
+  navigateToDetailedView: (team: string) => void;
+  // Hypothetical trade actions
+  setHypotheticalTrade: (trade: HypotheticalTrade | null) => void;
+  updateHypotheticalTrade: (updates: Partial<HypotheticalTrade>) => void;
+  clearHypotheticalTrade: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -50,6 +65,9 @@ export const useUIStore = create<UIState>((set) => ({
   whatIfLoaded: false,
   metaTeamModal: null,
   monteCarloStale: false,
+  viewMode: 'overview',
+  detailedViewTeam: null,
+  hypotheticalTrade: null,
 
   selectTeam: (team) => set({ selectedTeam: team, selectedGame: null }),
 
@@ -181,4 +199,25 @@ export const useUIStore = create<UIState>((set) => ({
 
   clearMonteCarloStale: () =>
     set({ monteCarloStale: false }),
+
+  // View mode actions
+  setViewMode: (mode) => set({ viewMode: mode }),
+
+  // Detailed view actions
+  setDetailedViewTeam: (team) => set({ detailedViewTeam: team }),
+
+  navigateToDetailedView: (team) =>
+    set({ viewMode: 'teamdetail', detailedViewTeam: team, selectedTeam: null, selectedGame: null }),
+
+  // Hypothetical trade actions
+  setHypotheticalTrade: (trade) => set({ hypotheticalTrade: trade }),
+
+  updateHypotheticalTrade: (updates) =>
+    set((state) => ({
+      hypotheticalTrade: state.hypotheticalTrade
+        ? { ...state.hypotheticalTrade, ...updates }
+        : null,
+    })),
+
+  clearHypotheticalTrade: () => set({ hypotheticalTrade: null }),
 }));

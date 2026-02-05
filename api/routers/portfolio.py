@@ -4,7 +4,13 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 import portfolio_value as pv
-from api.models import PositionsResponse, PortfolioSummary, DeltasResponse
+from api.models import (
+    PositionsResponse,
+    PortfolioSummary,
+    DeltasResponse,
+    HypotheticalValueRequest,
+    HypotheticalValueResponse,
+)
 from api.services.portfolio_service import PortfolioService, get_portfolio_service
 from api.services.tournament_service import TournamentService, get_tournament_service, apply_what_if
 
@@ -17,7 +23,8 @@ def get_positions(
 ):
     """Get current portfolio positions."""
     positions, is_mock = portfolio.get_positions()
-    return PositionsResponse(positions=positions, is_mock=is_mock)
+    cash_balance, _ = portfolio.get_cash_balance()
+    return PositionsResponse(positions=positions, cash_balance=cash_balance, is_mock=is_mock)
 
 
 @router.get("/value")
@@ -54,10 +61,15 @@ def get_value(
 
         # Calculate expected value (cheap probabilistic calculation)
         positions, _ = portfolio.get_positions()
+        cash_balance, _ = portfolio.get_cash_balance()
         scores = state.calculate_scores_prob()
         value = pv.get_portfolio_value(positions, scores)
 
-        return {"expected_value": value}
+        return {
+            "expected_value": value,
+            "cash_balance": cash_balance,
+            "total_value": value + cash_balance,
+        }
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -149,5 +161,69 @@ def get_team_impact(
             "portfolio_delta": deltas[team_name],
             "breakdown": breakdown,
         }
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/hypothetical-value", response_model=HypotheticalValueResponse)
+def get_hypothetical_value(
+    request: HypotheticalValueRequest,
+    what_if_outcomes: str = Query(default=None, description="JSON-encoded game outcomes"),
+    what_if_adjustments: str = Query(default=None, description="JSON-encoded rating adjustments"),
+    portfolio: PortfolioService = Depends(get_portfolio_service),
+    tournament: TournamentService = Depends(get_tournament_service),
+):
+    """Calculate portfolio value with hypothetical position changes.
+
+    This endpoint allows exploring the impact of potential trades on portfolio value.
+    The position_changes dict specifies quantity changes for each team (+ for buy, - for sell).
+    Note: Cash changes from trades are not computed here - that's done on the frontend
+    since it requires price info which is client-side only.
+    """
+    try:
+        # Parse what-if parameters
+        outcomes = []
+        adjustments = {}
+        if what_if_outcomes:
+            try:
+                outcomes = json.loads(what_if_outcomes)
+            except json.JSONDecodeError:
+                pass
+        if what_if_adjustments:
+            try:
+                adjustments = json.loads(what_if_adjustments)
+            except json.JSONDecodeError:
+                pass
+
+        # Get tournament state with any what-if modifications
+        state = tournament.get_state()
+        if outcomes or adjustments:
+            state = apply_what_if(state, game_outcomes=outcomes, rating_adjustments=adjustments)
+
+        # Get current positions and cash balance
+        positions, _ = portfolio.get_positions()
+        cash_balance, _ = portfolio.get_cash_balance()
+
+        # Calculate current portfolio value
+        scores = state.calculate_scores_prob()
+        current_value = pv.get_portfolio_value(positions, scores)
+
+        # Apply hypothetical position changes
+        hypothetical_positions = dict(positions)
+        for team, change in request.position_changes.items():
+            hypothetical_positions[team] = hypothetical_positions.get(team, 0.0) + change
+
+        # Calculate hypothetical portfolio value
+        hypothetical_value = pv.get_portfolio_value(hypothetical_positions, scores)
+
+        return HypotheticalValueResponse(
+            current_value=current_value,
+            hypothetical_value=hypothetical_value,
+            delta=hypothetical_value - current_value,
+            hypothetical_positions=hypothetical_positions,
+            current_cash=cash_balance,
+            current_total=current_value + cash_balance,
+            hypothetical_total=hypothetical_value + cash_balance,
+        )
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))

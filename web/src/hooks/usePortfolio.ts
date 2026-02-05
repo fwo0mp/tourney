@@ -51,3 +51,18 @@ export function useTeamImpact(teamName: string | null, pointDelta = 1.0) {
     staleTime: 60_000,
   });
 }
+
+export function useHypotheticalPortfolio(positionChanges: Record<string, number> | null) {
+  // Include whatIf so hypothetical value respects current what-if state
+  const whatIf = useUIStore((state) => state.whatIf);
+
+  const hasChanges = positionChanges !== null && Object.keys(positionChanges).length > 0;
+  const hasNonZeroChanges = hasChanges && Object.values(positionChanges!).some((v) => v !== 0);
+
+  return useQuery({
+    queryKey: ['portfolio', 'hypothetical', positionChanges, whatIf],
+    queryFn: () => portfolioApi.getHypotheticalValue(positionChanges!, whatIf),
+    enabled: hasNonZeroChanges,
+    staleTime: 30_000,
+  });
+}

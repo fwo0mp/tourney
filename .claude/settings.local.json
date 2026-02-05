@@ -15,7 +15,8 @@
       "Bash(npm run build:*)",
       "Bash(lsof:*)",
       "Bash(nm:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm run typecheck:*)"
     ]
   }
 }

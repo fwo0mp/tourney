@@ -1,66 +1,15 @@
-import { useState } from 'react';
 import { useTeams } from '../../hooks/useTournament';
 import { useUIStore } from '../../store/uiStore';
+import { SortHeader, useSortState, sortData } from '../common';
 import type { TeamInfo } from '../../types';
 
 type SortColumn = 'name' | 'position' | 'ev' | 'value' | 'delta';
-type SortMode = 'abs-desc' | 'desc' | 'asc';
-
-function getSortIndicator(mode: SortMode): string {
-  switch (mode) {
-    case 'abs-desc': return '↓|';
-    case 'desc': return '↓';
-    case 'asc': return '↑';
-  }
-}
-
-function SortHeader({
-  label,
-  column,
-  currentColumn,
-  sortMode,
-  onSort,
-  align = 'right',
-}: {
-  label: string;
-  column: SortColumn;
-  currentColumn: SortColumn;
-  sortMode: SortMode;
-  onSort: (col: SortColumn) => void;
-  align?: 'left' | 'right';
-}) {
-  const isActive = column === currentColumn;
-  return (
-    <th
-      className={`py-2 text-xs font-medium uppercase cursor-pointer hover:text-gray-700 select-none ${
-        align === 'left' ? 'text-left' : 'text-right'
-      } ${isActive ? 'text-gray-900' : 'text-gray-500'}`}
-      onClick={() => onSort(column)}
-    >
-      {label}
-      {isActive && (
-        <span className="ml-1">{getSortIndicator(sortMode)}</span>
-      )}
-    </th>
-  );
-}
 
 export function TeamsTable() {
   const { data: teams, isLoading } = useTeams();
   const selectTeam = useUIStore((state) => state.selectTeam);
-  const [sortColumn, setSortColumn] = useState<SortColumn>('value');
-  const [sortMode, setSortMode] = useState<SortMode>('abs-desc');
-
-  const handleSort = (column: SortColumn) => {
-    if (column === sortColumn) {
-      // Cycle through modes: abs-desc -> desc -> asc -> abs-desc
-      const nextMode: SortMode = sortMode === 'abs-desc' ? 'desc' : sortMode === 'desc' ? 'asc' : 'abs-desc';
-      setSortMode(nextMode);
-    } else {
-      setSortColumn(column);
-      setSortMode('abs-desc');
-    }
-  };
+  const navigateToDetailedView = useUIStore((state) => state.navigateToDetailedView);
+  const { sortColumn, sortMode, handleSort } = useSortState<SortColumn>('value');
 
   if (isLoading) {
     return (
@@ -82,49 +31,14 @@ export function TeamsTable() {
     (t) => t.position !== 0 || Math.abs(t.delta) > 0.01
   );
 
-  const sorted = [...teamsWithActivity].sort((a, b) => {
-    let aVal: number | string = 0;
-    let bVal: number | string = 0;
-
-    switch (sortColumn) {
-      case 'name':
-        aVal = a.name;
-        bVal = b.name;
-        break;
-      case 'position':
-        aVal = a.position;
-        bVal = b.position;
-        break;
-      case 'ev':
-        aVal = a.expected_score;
-        bVal = b.expected_score;
-        break;
-      case 'value':
-        aVal = getValue(a);
-        bVal = getValue(b);
-        break;
-      case 'delta':
-        aVal = a.delta;
-        bVal = b.delta;
-        break;
-    }
-
-    // For string comparison (name column)
-    if (typeof aVal === 'string' && typeof bVal === 'string') {
-      const cmp = aVal.localeCompare(bVal);
-      return sortMode === 'asc' ? cmp : -cmp;
-    }
-
-    // For numeric comparison
-    const aNum = aVal as number;
-    const bNum = bVal as number;
-
-    if (sortMode === 'abs-desc') {
-      return Math.abs(bNum) - Math.abs(aNum);
-    } else if (sortMode === 'desc') {
-      return bNum - aNum;
-    } else {
-      return aNum - bNum;
+  const sorted = sortData(teamsWithActivity, sortColumn, sortMode, (team, column) => {
+    switch (column) {
+      case 'name': return team.name;
+      case 'position': return team.position;
+      case 'ev': return team.expected_score;
+      case 'value': return getValue(team);
+      case 'delta': return team.delta;
+      default: return 0;
     }
   });
 
@@ -155,6 +69,10 @@ export function TeamsTable() {
                   team.is_eliminated ? 'opacity-50' : ''
                 }`}
                 onClick={() => selectTeam(team.name)}
+                onDoubleClick={(e) => {
+                  e.preventDefault();
+                  navigateToDetailedView(team.name);
+                }}
               >
                 <td className={`py-2 text-sm font-medium ${
                   team.is_eliminated ? 'text-gray-400 line-through' : 'text-gray-900'
