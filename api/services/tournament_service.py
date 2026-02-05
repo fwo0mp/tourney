@@ -325,6 +325,19 @@ def compute_path_to_slot_with_rounds(
     outcomes = []
     current_pos = start_pos
 
+    # Handle play-in games (round 0 slots with 2 teams)
+    # If the team is in a play-in game, they must beat their play-in opponent first
+    if start_pos < len(bracket):
+        starting_slot = bracket[start_pos]
+        if len(starting_slot) == 2 and team in starting_slot:
+            # This is a play-in game - team must beat the other team
+            for other_team in starting_slot.keys():
+                if other_team != team:
+                    outcomes.append((team, other_team))
+                    break
+
+    # If target_round is 0, we only need the play-in outcome (already added above)
+    # For higher rounds, continue computing path
     for round_num in range(target_round):
         if round_num >= len(rounds):
             break

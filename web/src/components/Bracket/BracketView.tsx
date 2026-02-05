@@ -28,6 +28,7 @@ interface BracketSlot {
   round: number;
   slotIndex: number;
   isFromCompletedGame?: boolean;  // True if team advanced here due to a completed game
+  isUndeterminedPlayIn?: boolean;  // True if this is a play-in slot with no determined winner
 }
 
 function getDeltaColor(delta: number, maxDelta: number): string {
@@ -189,13 +190,59 @@ function RegionBracket({
     // Create a set of slot indices that have play-in games
     const playInSlotIndices = new Set(playInGames.map(p => p.slot_index % 16));
 
+    // Create a map of slot index -> play-in game for quick lookup
+    const playInBySlot = new Map(playInGames.map(p => [p.slot_index % 16, p]));
+
+    // Build a map of play-in game outcomes from completed games and what-if
+    // Key: slot index, Value: winner team name
+    const playInWinners = new Map<number, string>();
+    for (const playIn of playInGames) {
+      const slotIdx = playIn.slot_index % 16;
+      // Check completed games first
+      const completedOutcome = completedGames.find(
+        g => (g.winner === playIn.team1 && g.loser === playIn.team2) ||
+             (g.winner === playIn.team2 && g.loser === playIn.team1)
+      );
+      if (completedOutcome) {
+        playInWinners.set(slotIdx, completedOutcome.winner);
+      } else {
+        // Check what-if outcomes
+        const whatIfOutcome = whatIf.gameOutcomes.find(
+          g => (g.winner === playIn.team1 && g.loser === playIn.team2) ||
+               (g.winner === playIn.team2 && g.loser === playIn.team1)
+        );
+        if (whatIfOutcome) {
+          playInWinners.set(slotIdx, whatIfOutcome.winner);
+        }
+      }
+    }
+
     // Round 0: All 16 teams from the games
     games.forEach((game, i) => {
       // Get the team with highest probability (the "primary" team)
       const teamEntries = Object.entries(game.teams);
       teamEntries.sort((a, b) => b[1] - a[1]);
-      const teamName = teamEntries[0]?.[0] || '';
-      const teamInfo = teamInfoMap.get(teamName) || null;
+
+      // For play-in slots, use determined winner if available
+      let teamName = '';
+      let isUndeterminedPlayIn = false;
+      if (playInSlotIndices.has(i)) {
+        // This is a play-in game slot
+        const winner = playInWinners.get(i);
+        if (winner) {
+          // Winner has been determined (via completed game or what-if)
+          teamName = winner;
+        } else {
+          // No winner determined yet - mark as undetermined but still show slot
+          isUndeterminedPlayIn = true;
+          // Use empty string to indicate no determined winner
+          teamName = '';
+        }
+      } else {
+        // Regular slot - use highest probability team
+        teamName = teamEntries[0]?.[0] || '';
+      }
+      const teamInfo = teamName ? teamInfoMap.get(teamName) || null : null;
 
       // When flipped, rounds go right-to-left, play-in is at far right
       // When not flipped, rounds go left-to-right, play-in is at far left
@@ -211,6 +258,7 @@ function RegionBracket({
         y,
         round: 0,
         slotIndex: i,
+        isUndeterminedPlayIn,
       });
     });
 
@@ -641,8 +689,8 @@ function RegionBracket({
     // Draw team slots
     const slotGroup = contentGroup.append('g').attr('class', 'slots');
 
-    // Round 0 slots with teams
-    slots.filter(s => s.round === 0 && s.teamName).forEach((slot) => {
+    // Round 0 slots with teams (or undetermined play-in slots)
+    slots.filter(s => s.round === 0 && (s.teamName || s.isUndeterminedPlayIn)).forEach((slot) => {
       // Check if this slot has a play-in game (multiple teams)
       const isPlayInSlot = playInSlotIndices.has(slot.slotIndex);
       // Calculate global position for modal
@@ -650,8 +698,8 @@ function RegionBracket({
       const globalPosition = regionIndex * slotsPerRegionRound0 + slot.slotIndex;
 
       // Check completion status
-      const hasWonGame = completedWinners.has(slot.teamName);
-      const isEliminated = eliminatedTeams.has(slot.teamName);
+      const hasWonGame = slot.teamName ? completedWinners.has(slot.teamName) : false;
+      const isEliminated = slot.teamName ? eliminatedTeams.has(slot.teamName) : false;
 
       const group = slotGroup.append('g')
         .attr('transform', `translate(${slot.x}, ${slot.y})`)
@@ -661,7 +709,7 @@ function RegionBracket({
           if (isPlayInSlot) {
             // For play-in slots, open modal to show both candidates
             openMetaTeamModal(0, globalPosition);
-          } else {
+          } else if (slot.teamName) {
             selectTeam(slot.teamName);
           }
         })
@@ -684,30 +732,50 @@ function RegionBracket({
       } else if (slot.teamName === selectedTeam) {
         strokeColor = '#3b82f6';
         strokeWidth = 2;
+      } else if (slot.isUndeterminedPlayIn) {
+        // Dashed border for undetermined play-in
+        strokeColor = '#9ca3af';
       }
 
       // Background rect
-      group.append('rect')
+      const rect = group.append('rect')
         .attr('width', slotWidth)
         .attr('height', slotHeight)
         .attr('rx', 3)
-        .attr('fill', getDeltaColor(delta, maxDelta))
+        .attr('fill', slot.isUndeterminedPlayIn ? '#f3f4f6' : getDeltaColor(delta, maxDelta))
         .attr('stroke', strokeColor)
         .attr('stroke-width', strokeWidth);
+
+      if (slot.isUndeterminedPlayIn) {
+        rect.attr('stroke-dasharray', '4,2');
+      }
 
       // Team name (use smaller font in compact mode)
       // Apply strikethrough and grey color for eliminated teams
       const fontSize = compact ? '9px' : '10px';
       const maxNameLen = compact ? 11 : 14;
-      const textEl = group.append('text')
-        .attr('x', 4)
-        .attr('y', slotHeight / 2 + 4)
-        .attr('font-size', fontSize)
-        .attr('fill', isEliminated ? '#9ca3af' : '#374151')
-        .text(slot.teamName.length > maxNameLen ? slot.teamName.substring(0, maxNameLen - 2) + '..' : slot.teamName);
 
-      if (isEliminated) {
-        textEl.attr('text-decoration', 'line-through');
+      if (slot.isUndeterminedPlayIn) {
+        // Show "TBD" or similar for undetermined play-in
+        group.append('text')
+          .attr('x', slotWidth / 2)
+          .attr('y', slotHeight / 2 + 4)
+          .attr('text-anchor', 'middle')
+          .attr('font-size', fontSize)
+          .attr('fill', '#9ca3af')
+          .attr('font-style', 'italic')
+          .text('Play-in TBD');
+      } else {
+        const textEl = group.append('text')
+          .attr('x', 4)
+          .attr('y', slotHeight / 2 + 4)
+          .attr('font-size', fontSize)
+          .attr('fill', isEliminated ? '#9ca3af' : '#374151')
+          .text(slot.teamName.length > maxNameLen ? slot.teamName.substring(0, maxNameLen - 2) + '..' : slot.teamName);
+
+        if (isEliminated) {
+          textEl.attr('text-decoration', 'line-through');
+        }
       }
     });
 
