@@ -3,7 +3,7 @@ import * as d3 from 'd3';
 import { useTeams, useBracket } from '../../hooks/useTournament';
 import { useUIStore } from '../../store/uiStore';
 import { MetaTeamModal } from './MetaTeamModal';
-import type { TeamInfo, BracketGame, PlayInGame } from '../../types';
+import type { TeamInfo, BracketGame, PlayInGame, CompletedGame } from '../../types';
 
 type BracketViewType = 'overall' | 'region1' | 'region2' | 'region3' | 'region4' | 'sweet16';
 
@@ -27,6 +27,7 @@ interface BracketSlot {
   y: number;
   round: number;
   slotIndex: number;
+  isFromCompletedGame?: boolean;  // True if team advanced here due to a completed game
 }
 
 function getDeltaColor(delta: number, maxDelta: number): string {
@@ -50,19 +51,19 @@ function getDeltaColor(delta: number, maxDelta: number): string {
   }
 }
 
-// Build a map of which team is in each slot based on what-if outcomes
-function buildWhatIfSlotMap(
+// Build a map of which team is in each slot based on game outcomes
+// Returns Map of "round-slotIndex" -> team name
+function buildSlotMapFromOutcomes(
   games: BracketGame[],
-  whatIfOutcomes: { winner: string; loser: string }[]
+  outcomes: { winner: string; loser: string }[]
 ): Map<string, string> {
-  // Map of "round-slotIndex" -> team name
   const slotMap = new Map<string, string>();
 
-  if (whatIfOutcomes.length === 0) return slotMap;
+  if (outcomes.length === 0) return slotMap;
 
   // Create a map of winner -> teams they beat (their "path")
   const winnerBeats = new Map<string, Set<string>>();
-  for (const outcome of whatIfOutcomes) {
+  for (const outcome of outcomes) {
     if (!winnerBeats.has(outcome.winner)) {
       winnerBeats.set(outcome.winner, new Set());
     }
@@ -121,6 +122,7 @@ function buildWhatIfSlotMap(
 function RegionBracket({
   games,
   playInGames = [],
+  completedGames = [],
   teamInfoMap,
   regionIndex,
   maxDelta,
@@ -129,6 +131,7 @@ function RegionBracket({
 }: {
   games: BracketGame[];
   playInGames?: PlayInGame[];
+  completedGames?: CompletedGame[];
   teamInfoMap: Map<string, TeamInfo>;
   regionIndex: number;  // 0-3 for the four regions
   maxDelta: number;
@@ -168,8 +171,14 @@ function RegionBracket({
     // Offset for all rounds to make room for play-in column
     const playInOffset = hasPlayIns ? (slotWidth + roundGap) : 0;
 
-    // Compute which teams are in later round slots based on what-if outcomes
-    const whatIfSlotMap = buildWhatIfSlotMap(games, whatIf.gameOutcomes);
+    // Build set of teams that have won completed games for quick lookup
+    const completedWinners = new Set(completedGames.map(g => g.winner));
+    const eliminatedTeams = new Set(completedGames.map(g => g.loser));
+
+    // Compute which teams are in later round slots based on completed games and what-if outcomes
+    // Completed games take priority over what-if outcomes
+    const completedSlotMap = buildSlotMapFromOutcomes(games, completedGames);
+    const whatIfSlotMap = buildSlotMapFromOutcomes(games, whatIf.gameOutcomes);
 
     // Build slots from games - each game has one team (or multiple for play-in)
     // For a 16-team region, we have 16 slots in round 0
@@ -204,7 +213,7 @@ function RegionBracket({
       });
     });
 
-    // Add slots for later rounds (may have determined teams from what-if)
+    // Add slots for later rounds (may have determined teams from completed games or what-if)
     // Round 0: 16, Round 1: 8, Round 2: 4, Round 3: 2, Round 4: 1
     for (let round = 1; round < rounds; round++) {
       const slotsInRound = Math.pow(2, 4 - round);  // 8, 4, 2, 1
@@ -216,10 +225,13 @@ function RegionBracket({
           ? (rounds - 1 - round) * (slotWidth + roundGap)  // No offset when flipped
           : round * (slotWidth + roundGap) + playInOffset;  // Offset when not flipped
 
-        // Check if there's a what-if selected team for this slot
+        // Check for team in this slot - completed games take priority over what-if
         const slotKey = `${round}-${i}`;
-        const teamName = whatIfSlotMap.get(slotKey) || '';
+        const completedTeam = completedSlotMap.get(slotKey);
+        const whatIfTeam = whatIfSlotMap.get(slotKey);
+        const teamName = completedTeam || whatIfTeam || '';
         const teamInfo = teamName ? teamInfoMap.get(teamName) || null : null;
+        const isFromCompletedGame = !!completedTeam;
 
         slots.push({
           teamName,
@@ -228,6 +240,7 @@ function RegionBracket({
           y,
           round,
           slotIndex: i,
+          isFromCompletedGame,
         });
       }
     }
@@ -307,6 +320,12 @@ function RegionBracket({
         const delta1 = team1Info?.delta || 0;
         const delta2 = team2Info?.delta || 0;
 
+        // Check completion status for play-in teams
+        const team1WonGame = completedWinners.has(playIn.team1);
+        const team1Eliminated = eliminatedTeams.has(playIn.team1);
+        const team2WonGame = completedWinners.has(playIn.team2);
+        const team2Eliminated = eliminatedTeams.has(playIn.team2);
+
         // Team 1 slot (top)
         const team1Group = playInGroup.append('g')
           .attr('transform', `translate(${playInX}, ${team1Y})`)
@@ -316,22 +335,34 @@ function RegionBracket({
             selectTeam(playIn.team1);
           });
 
+        // Determine team 1 stroke
+        let team1Stroke = playIn.team1 === selectedTeam ? '#3b82f6' : '#d1d5db';
+        let team1StrokeWidth = playIn.team1 === selectedTeam ? 2 : 1;
+        if (team1WonGame) {
+          team1Stroke = '#16a34a';
+          team1StrokeWidth = 2;
+        }
+
         team1Group.append('rect')
           .attr('width', slotWidth)
           .attr('height', slotHeight)
           .attr('rx', 3)
           .attr('fill', getDeltaColor(delta1, maxDelta))
-          .attr('stroke', playIn.team1 === selectedTeam ? '#3b82f6' : '#d1d5db')
-          .attr('stroke-width', playIn.team1 === selectedTeam ? 2 : 1);
+          .attr('stroke', team1Stroke)
+          .attr('stroke-width', team1StrokeWidth);
 
         const fontSize = compact ? '9px' : '10px';
         const maxNameLen = compact ? 11 : 14;
-        team1Group.append('text')
+        const team1Text = team1Group.append('text')
           .attr('x', 4)
           .attr('y', slotHeight / 2 + 4)
           .attr('font-size', fontSize)
-          .attr('fill', '#374151')
+          .attr('fill', team1Eliminated ? '#9ca3af' : '#374151')
           .text(playIn.team1.length > maxNameLen ? playIn.team1.substring(0, maxNameLen - 2) + '..' : playIn.team1);
+
+        if (team1Eliminated) {
+          team1Text.attr('text-decoration', 'line-through');
+        }
 
         // Win probability badge for team 1
         team1Group.append('text')
@@ -351,20 +382,32 @@ function RegionBracket({
             selectTeam(playIn.team2);
           });
 
+        // Determine team 2 stroke
+        let team2Stroke = playIn.team2 === selectedTeam ? '#3b82f6' : '#d1d5db';
+        let team2StrokeWidth = playIn.team2 === selectedTeam ? 2 : 1;
+        if (team2WonGame) {
+          team2Stroke = '#16a34a';
+          team2StrokeWidth = 2;
+        }
+
         team2Group.append('rect')
           .attr('width', slotWidth)
           .attr('height', slotHeight)
           .attr('rx', 3)
           .attr('fill', getDeltaColor(delta2, maxDelta))
-          .attr('stroke', playIn.team2 === selectedTeam ? '#3b82f6' : '#d1d5db')
-          .attr('stroke-width', playIn.team2 === selectedTeam ? 2 : 1);
+          .attr('stroke', team2Stroke)
+          .attr('stroke-width', team2StrokeWidth);
 
-        team2Group.append('text')
+        const team2Text = team2Group.append('text')
           .attr('x', 4)
           .attr('y', slotHeight / 2 + 4)
           .attr('font-size', fontSize)
-          .attr('fill', '#374151')
+          .attr('fill', team2Eliminated ? '#9ca3af' : '#374151')
           .text(playIn.team2.length > maxNameLen ? playIn.team2.substring(0, maxNameLen - 2) + '..' : playIn.team2);
+
+        if (team2Eliminated) {
+          team2Text.attr('text-decoration', 'line-through');
+        }
 
         // Win probability badge for team 2
         team2Group.append('text')
@@ -516,6 +559,10 @@ function RegionBracket({
       const slotsPerRegionRound0 = 16;
       const globalPosition = regionIndex * slotsPerRegionRound0 + slot.slotIndex;
 
+      // Check completion status
+      const hasWonGame = completedWinners.has(slot.teamName);
+      const isEliminated = eliminatedTeams.has(slot.teamName);
+
       const group = slotGroup.append('g')
         .attr('transform', `translate(${slot.x}, ${slot.y})`)
         .attr('cursor', 'pointer')
@@ -531,24 +578,40 @@ function RegionBracket({
 
       const delta = slot.teamInfo?.delta || 0;
 
+      // Determine stroke color: green for winners, blue for selected, default otherwise
+      let strokeColor = '#d1d5db';
+      let strokeWidth = 1;
+      if (hasWonGame) {
+        strokeColor = '#16a34a'; // green-600 for completed game winners
+        strokeWidth = 2;
+      } else if (slot.teamName === selectedTeam) {
+        strokeColor = '#3b82f6';
+        strokeWidth = 2;
+      }
+
       // Background rect
       group.append('rect')
         .attr('width', slotWidth)
         .attr('height', slotHeight)
         .attr('rx', 3)
         .attr('fill', getDeltaColor(delta, maxDelta))
-        .attr('stroke', slot.teamName === selectedTeam ? '#3b82f6' : '#d1d5db')
-        .attr('stroke-width', slot.teamName === selectedTeam ? 2 : 1);
+        .attr('stroke', strokeColor)
+        .attr('stroke-width', strokeWidth);
 
       // Team name (use smaller font in compact mode)
+      // Apply strikethrough and grey color for eliminated teams
       const fontSize = compact ? '9px' : '10px';
       const maxNameLen = compact ? 11 : 14;
-      group.append('text')
+      const textEl = group.append('text')
         .attr('x', 4)
         .attr('y', slotHeight / 2 + 4)
         .attr('font-size', fontSize)
-        .attr('fill', '#374151')
+        .attr('fill', isEliminated ? '#9ca3af' : '#374151')
         .text(slot.teamName.length > maxNameLen ? slot.teamName.substring(0, maxNameLen - 2) + '..' : slot.teamName);
+
+      if (isEliminated) {
+        textEl.attr('text-decoration', 'line-through');
+      }
     });
 
     // Later round slots - may have determined teams or be empty/clickable
@@ -563,16 +626,34 @@ function RegionBracket({
 
       if (slot.teamName) {
         // Slot has a determined team - render like round 0 slots
+        const isEliminated = eliminatedTeams.has(slot.teamName);
+
         const group = slotGroup.append('g')
           .attr('transform', `translate(${slot.x}, ${slot.y})`)
           .attr('cursor', 'pointer')
           .on('click', (event: MouseEvent) => {
             event.stopPropagation();
-            // Still allow clicking to see other candidates or select a different team
-            openMetaTeamModal(globalRound, globalPosition);
+            if (slot.isFromCompletedGame) {
+              // Team is confirmed here via completed games - select the team
+              selectTeam(slot.teamName);
+            } else {
+              // Team is here via what-if - allow changing via meta team modal
+              openMetaTeamModal(globalRound, globalPosition);
+            }
           });
 
         const delta = slot.teamInfo?.delta || 0;
+
+        // Determine stroke: thick black for completed game advancement, blue for selected, default otherwise
+        let strokeColor = '#d1d5db';
+        let strokeWidth = 1;
+        if (slot.isFromCompletedGame) {
+          strokeColor = '#000000'; // Black for confirmed advancement from completed games
+          strokeWidth = 3;
+        } else if (slot.teamName === selectedTeam) {
+          strokeColor = '#3b82f6';
+          strokeWidth = 2;
+        }
 
         // Background rect with delta color
         group.append('rect')
@@ -580,29 +661,35 @@ function RegionBracket({
           .attr('height', slotHeight)
           .attr('rx', 3)
           .attr('fill', getDeltaColor(delta, maxDelta))
-          .attr('stroke', slot.teamName === selectedTeam ? '#3b82f6' : '#d1d5db')
-          .attr('stroke-width', slot.teamName === selectedTeam ? 2 : 1);
+          .attr('stroke', strokeColor)
+          .attr('stroke-width', strokeWidth);
 
         // Team name
         const fontSize = compact ? '9px' : '10px';
         const maxNameLen = compact ? 11 : 14;
-        group.append('text')
+        const textEl = group.append('text')
           .attr('x', 4)
           .attr('y', slotHeight / 2 + 4)
           .attr('font-size', fontSize)
-          .attr('fill', '#374151')
+          .attr('fill', isEliminated ? '#9ca3af' : '#374151')
           .text(slot.teamName.length > maxNameLen ? slot.teamName.substring(0, maxNameLen - 2) + '..' : slot.teamName);
 
-        // Hover effect
-        group.on('mouseenter', function() {
-          d3.select(this).select('rect')
-            .attr('stroke', '#3b82f6')
-            .attr('stroke-width', 2);
-        }).on('mouseleave', function() {
-          d3.select(this).select('rect')
-            .attr('stroke', slot.teamName === selectedTeam ? '#3b82f6' : '#d1d5db')
-            .attr('stroke-width', slot.teamName === selectedTeam ? 2 : 1);
-        });
+        if (isEliminated) {
+          textEl.attr('text-decoration', 'line-through');
+        }
+
+        // Hover effect (only if not from completed game)
+        if (!slot.isFromCompletedGame) {
+          group.on('mouseenter', function() {
+            d3.select(this).select('rect')
+              .attr('stroke', '#3b82f6')
+              .attr('stroke-width', 2);
+          }).on('mouseleave', function() {
+            d3.select(this).select('rect')
+              .attr('stroke', slot.teamName === selectedTeam ? '#3b82f6' : '#d1d5db')
+              .attr('stroke-width', slot.teamName === selectedTeam ? 2 : 1);
+          });
+        }
       } else {
         // Empty slot - clickable to open meta-team modal
         const group = slotGroup.append('g')
@@ -634,7 +721,7 @@ function RegionBracket({
       }
     });
 
-  }, [games, playInGames, teamInfoMap, maxDelta, flipHorizontal, compact, selectTeam, selectGame, selectedTeam, selectedGame, regionIndex, openMetaTeamModal, whatIf]);
+  }, [games, playInGames, completedGames, teamInfoMap, maxDelta, flipHorizontal, compact, selectTeam, selectGame, selectedTeam, selectedGame, regionIndex, openMetaTeamModal, whatIf]);
 
   const slotWidth = compact ? COMPACT_SLOT_WIDTH : SLOT_WIDTH;
   const roundGap = compact ? COMPACT_ROUND_GAP : ROUND_GAP;
@@ -1045,6 +1132,7 @@ export function BracketView() {
           <RegionBracket
             games={regions[0].games}
             playInGames={regions[0].playInGames}
+            completedGames={bracket.completed_games || []}
             teamInfoMap={teamInfoMap}
             regionIndex={0}
             maxDelta={maxDelta}
@@ -1055,6 +1143,7 @@ export function BracketView() {
           <RegionBracket
             games={regions[1].games}
             playInGames={regions[1].playInGames}
+            completedGames={bracket.completed_games || []}
             teamInfoMap={teamInfoMap}
             regionIndex={1}
             maxDelta={maxDelta}
@@ -1065,6 +1154,7 @@ export function BracketView() {
           <RegionBracket
             games={regions[2].games}
             playInGames={regions[2].playInGames}
+            completedGames={bracket.completed_games || []}
             teamInfoMap={teamInfoMap}
             regionIndex={2}
             maxDelta={maxDelta}
@@ -1075,6 +1165,7 @@ export function BracketView() {
           <RegionBracket
             games={regions[3].games}
             playInGames={regions[3].playInGames}
+            completedGames={bracket.completed_games || []}
             teamInfoMap={teamInfoMap}
             regionIndex={3}
             maxDelta={maxDelta}
@@ -1097,6 +1188,7 @@ export function BracketView() {
               <RegionBracket
                 games={regions[0].games}
                 playInGames={regions[0].playInGames}
+                completedGames={bracket.completed_games || []}
                 teamInfoMap={teamInfoMap}
                 regionIndex={0}
                 maxDelta={maxDelta}
@@ -1105,6 +1197,7 @@ export function BracketView() {
               <RegionBracket
                 games={regions[1].games}
                 playInGames={regions[1].playInGames}
+                completedGames={bracket.completed_games || []}
                 teamInfoMap={teamInfoMap}
                 regionIndex={1}
                 maxDelta={maxDelta}
@@ -1115,6 +1208,7 @@ export function BracketView() {
               <RegionBracket
                 games={regions[2].games}
                 playInGames={regions[2].playInGames}
+                completedGames={bracket.completed_games || []}
                 teamInfoMap={teamInfoMap}
                 regionIndex={2}
                 maxDelta={maxDelta}
@@ -1124,6 +1218,7 @@ export function BracketView() {
               <RegionBracket
                 games={regions[3].games}
                 playInGames={regions[3].playInGames}
+                completedGames={bracket.completed_games || []}
                 teamInfoMap={teamInfoMap}
                 regionIndex={3}
                 maxDelta={maxDelta}

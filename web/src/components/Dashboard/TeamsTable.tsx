@@ -151,10 +151,14 @@ export function TeamsTable() {
             {sorted.map((team: TeamInfo) => (
               <tr
                 key={team.name}
-                className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                className={`border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${
+                  team.is_eliminated ? 'opacity-50' : ''
+                }`}
                 onClick={() => selectTeam(team.name)}
               >
-                <td className="py-2 text-sm font-medium text-gray-900">{team.name}</td>
+                <td className={`py-2 text-sm font-medium ${
+                  team.is_eliminated ? 'text-gray-400 line-through' : 'text-gray-900'
+                }`}>{team.name}</td>
                 <td className={`py-2 text-sm text-right ${team.position > 0 ? 'text-green-600' : team.position < 0 ? 'text-red-600' : 'text-gray-400'}`}>
                   {team.position !== 0 ? (team.position > 0 ? '+' : '') + team.position.toFixed(1) : '-'}
                 </td>

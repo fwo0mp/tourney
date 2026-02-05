@@ -39,6 +39,9 @@ tourney_env
 .env
 .venv
 
+# SQLite database
+tourney.db
+
 # Rust build outputs
 target/
 Cargo.lock

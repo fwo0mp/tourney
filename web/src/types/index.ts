@@ -7,6 +7,7 @@ export interface TeamInfo {
   expected_score: number;
   position: number;
   delta: number;
+  is_eliminated: boolean;
 }
 
 export interface HistogramBin {
@@ -79,6 +80,8 @@ export interface BracketResponse {
   play_in_games: PlayInGame[];
   num_teams: number;
   num_rounds: number;
+  completed_games: CompletedGame[];
+  eliminated_teams: string[];
 }
 
 export interface PositionsResponse {
@@ -92,6 +95,11 @@ export interface DeltasResponse {
 }
 
 export interface WhatIfGameOutcome {
+  winner: string;
+  loser: string;
+}
+
+export interface CompletedGame {
   winner: string;
   loser: string;
 }

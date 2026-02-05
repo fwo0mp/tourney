@@ -6,6 +6,8 @@ from typing import Optional
 
 import tourney_utils as tourney
 
+from api import database as db
+
 
 class TournamentService:
     """Service for tournament calculations with caching."""
@@ -16,6 +18,7 @@ class TournamentService:
         self.state: Optional[tourney.TournamentState] = None
         self.ratings: dict = {}
         self.scores: dict = {}
+        self.completed_games: list[tuple[str, str]] = []
         self._bracket_file = "bracket.txt"
         self._ratings_file = "ratings.txt"
         self._adjustments_file = "adjustments.txt"
@@ -64,8 +67,21 @@ class TournamentService:
             forfeit_prob=0.0,
         )
 
+        # Load and apply completed games
+        self.completed_games = self.load_completed_games()
+        for winner, loser in self.completed_games:
+            self.state = self.state.with_override(winner, loser, 1.0)
+
         # Calculate expected scores
         self.scores = self.state.calculate_scores_prob()
+
+    def load_completed_games(self) -> list[tuple[str, str]]:
+        """Load completed games from database."""
+        return db.get_completed_games()
+
+    def get_eliminated_teams(self) -> set[str]:
+        """Get set of teams that have been eliminated."""
+        return {loser for _, loser in self.completed_games}
 
     def ensure_loaded(self):
         """Ensure tournament state is loaded."""
@@ -191,19 +207,35 @@ def apply_what_if(
     state: tourney.TournamentState,
     game_outcomes: list = None,
     rating_adjustments: dict = None,
+    completed_games: list[tuple[str, str]] = None,
 ) -> tourney.TournamentState:
-    """Apply what-if modifications to a tournament state."""
+    """Apply what-if modifications to a tournament state.
+
+    Respects completed games: if a team has already been eliminated,
+    what-if outcomes that have them winning are silently ignored.
+    """
     modified_state = state
+
+    # Build set of eliminated teams (losers of completed games)
+    eliminated = set()
+    if completed_games:
+        eliminated = {loser for _, loser in completed_games}
+
     if game_outcomes:
         for outcome in game_outcomes:
-            modified_state = modified_state.with_override(
-                outcome.get("winner") or outcome.winner,
-                outcome.get("loser") or outcome.loser,
-                1.0,
-            )
+            winner = outcome.get("winner") or outcome.winner
+            loser = outcome.get("loser") or outcome.loser
+
+            # Skip if winner is already eliminated
+            if winner in eliminated:
+                continue
+
+            modified_state = modified_state.with_override(winner, loser, 1.0)
+
     if rating_adjustments:
         for team_name, delta in rating_adjustments.items():
             modified_state = modified_state.with_team_adjustment(team_name, delta)
+
     return modified_state
 
 

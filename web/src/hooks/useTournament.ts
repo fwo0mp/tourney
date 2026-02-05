@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tournamentApi } from '../api/tournament';
 import { analysisApi } from '../api/analysis';
 import { useUIStore } from '../store/uiStore';
@@ -55,5 +55,41 @@ export function useSlotCandidates(round: number | null, position: number | null)
     queryFn: () => analysisApi.getSlotCandidates(round!, position!, whatIf),
     enabled: round !== null && position !== null && round >= 0 && position >= 0,
     staleTime: 60_000,
+  });
+}
+
+export function useCompletedGames() {
+  return useQuery({
+    queryKey: ['tournament', 'completed-games'],
+    queryFn: () => tournamentApi.getCompletedGames(),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useAddCompletedGame() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ winner, loser }: { winner: string; loser: string }) =>
+      tournamentApi.addCompletedGame(winner, loser),
+    onSuccess: () => {
+      // Invalidate all tournament-related queries since completed games affect everything
+      queryClient.invalidateQueries({ queryKey: ['tournament'] });
+      queryClient.invalidateQueries({ queryKey: ['analysis'] });
+      queryClient.invalidateQueries({ queryKey: ['portfolio'] });
+    },
+  });
+}
+
+export function useRemoveCompletedGame() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ winner, loser }: { winner: string; loser: string }) =>
+      tournamentApi.removeCompletedGame(winner, loser),
+    onSuccess: () => {
+      // Invalidate all tournament-related queries
+      queryClient.invalidateQueries({ queryKey: ['tournament'] });
+      queryClient.invalidateQueries({ queryKey: ['analysis'] });
+      queryClient.invalidateQueries({ queryKey: ['portfolio'] });
+    },
   });
 }

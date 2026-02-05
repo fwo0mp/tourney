@@ -14,6 +14,7 @@ class TeamInfo(BaseModel):
     expected_score: float
     position: float = 0.0
     delta: float = 0.0
+    is_eliminated: bool = False
 
 
 class HistogramBin(BaseModel):
@@ -81,6 +82,13 @@ class WhatIfGameOutcome(BaseModel):
     loser: str
 
 
+class CompletedGame(BaseModel):
+    """A completed tournament game."""
+
+    winner: str
+    loser: str
+
+
 class WhatIfRequest(BaseModel):
     """Request for what-if scenario analysis."""
 
@@ -126,6 +134,8 @@ class BracketResponse(BaseModel):
     play_in_games: list[PlayInGame] = []  # Play-in games (Round -1)
     num_teams: int
     num_rounds: int
+    completed_games: list[CompletedGame] = []
+    eliminated_teams: list[str] = []
 
 
 class PositionsResponse(BaseModel):

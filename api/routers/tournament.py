@@ -3,9 +3,10 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from api.models import TeamInfo, BracketResponse, BracketGame, PlayInGame
+from api.models import TeamInfo, BracketResponse, BracketGame, PlayInGame, CompletedGame
 from api.services.tournament_service import TournamentService, get_tournament_service, apply_what_if
 from api.services.portfolio_service import PortfolioService, get_portfolio_service
+from api import database as db
 import portfolio_value as pv
 
 router = APIRouter(prefix="/tournament", tags=["tournament"])
@@ -47,7 +48,7 @@ def get_teams(
         outcomes, adjustments = parse_what_if_params(what_if_outcomes, what_if_adjustments)
         state = tournament.get_state()
         if outcomes or adjustments:
-            state = apply_what_if(state, outcomes, adjustments)
+            state = apply_what_if(state, outcomes, adjustments, tournament.completed_games)
 
         # Calculate scores with the (possibly modified) state
         scores = state.calculate_scores_prob()
@@ -55,6 +56,9 @@ def get_teams(
 
         # Calculate deltas with the modified state
         team_deltas, _ = pv.get_all_team_deltas(positions, state)
+
+        # Get eliminated teams
+        eliminated = tournament.get_eliminated_teams()
 
         result = []
         for team_name in state.get_bracket_teams():
@@ -69,6 +73,7 @@ def get_teams(
                         expected_score=scores.get(team_name, 0.0),
                         position=positions.get(team_name, 0.0),
                         delta=team_deltas.get(team_name, 0.0),
+                        is_eliminated=team_name in eliminated,
                     )
                 )
 
@@ -88,6 +93,7 @@ def get_team(
         team = tournament.get_team_info(team_name)
         positions, _ = portfolio.get_positions()
         deltas, _ = portfolio.get_all_deltas()
+        eliminated = tournament.get_eliminated_teams()
 
         return TeamInfo(
             name=team["name"],
@@ -97,6 +103,7 @@ def get_team(
             expected_score=team["expected_score"],
             position=positions.get(team_name, 0.0),
             delta=deltas.get(team_name, 0.0),
+            is_eliminated=team_name in eliminated,
         )
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Team not found: {team_name}")
@@ -116,7 +123,7 @@ def get_bracket(
         outcomes, adjustments = parse_what_if_params(what_if_outcomes, what_if_adjustments)
         state = tournament.get_state()
         if outcomes or adjustments:
-            state = apply_what_if(state, outcomes, adjustments)
+            state = apply_what_if(state, outcomes, adjustments, tournament.completed_games)
 
         # Get bracket structure from the modified state
         bracket = state.bracket
@@ -175,11 +182,20 @@ def get_bracket(
                 )
             )
 
+        # Build completed games list for response
+        completed_games = [
+            CompletedGame(winner=w, loser=l)
+            for w, l in tournament.completed_games
+        ]
+        eliminated_teams = list(tournament.get_eliminated_teams())
+
         return BracketResponse(
             games=games,
             play_in_games=play_in_games,
             num_teams=num_teams,
             num_rounds=num_rounds,
+            completed_games=completed_games,
+            eliminated_teams=eliminated_teams,
         )
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -194,3 +210,63 @@ def get_scores(
         return tournament.get_scores()
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/completed-games", response_model=list[CompletedGame])
+def get_completed_games(
+    tournament: TournamentService = Depends(get_tournament_service),
+):
+    """Get all completed games."""
+    tournament.ensure_loaded()
+    return [
+        CompletedGame(winner=winner, loser=loser)
+        for winner, loser in tournament.completed_games
+    ]
+
+
+@router.post("/completed-games", response_model=CompletedGame)
+def add_completed_game(
+    game: CompletedGame,
+    tournament: TournamentService = Depends(get_tournament_service),
+):
+    """Add a completed game result."""
+    tournament.ensure_loaded()
+
+    # Verify both teams exist in the tournament
+    bracket_teams = tournament.state.get_bracket_teams()
+    if game.winner not in bracket_teams:
+        raise HTTPException(status_code=400, detail=f"Team not in tournament: {game.winner}")
+    if game.loser not in bracket_teams:
+        raise HTTPException(status_code=400, detail=f"Team not in tournament: {game.loser}")
+
+    # Check if winner is already eliminated
+    eliminated = tournament.get_eliminated_teams()
+    if game.winner in eliminated:
+        raise HTTPException(status_code=400, detail=f"Team already eliminated: {game.winner}")
+
+    # Add to database
+    added = db.add_completed_game(game.winner, game.loser)
+    if not added:
+        raise HTTPException(status_code=400, detail="Game already recorded")
+
+    # Reload tournament state to reflect the new completed game
+    tournament.load()
+
+    return game
+
+
+@router.delete("/completed-games")
+def remove_completed_game(
+    winner: str = Query(..., description="Winning team name"),
+    loser: str = Query(..., description="Losing team name"),
+    tournament: TournamentService = Depends(get_tournament_service),
+):
+    """Remove a completed game result."""
+    removed = db.remove_completed_game(winner, loser)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    # Reload tournament state
+    tournament.load()
+
+    return {"success": True}

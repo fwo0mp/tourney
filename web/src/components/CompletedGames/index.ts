@@ -1,0 +1,1 @@
+export { CompletedGamesView } from './CompletedGamesView';

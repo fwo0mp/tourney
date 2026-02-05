@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useGameImpact } from '../../hooks/useTournament';
+import { useGameImpact, useBracket, useAddCompletedGame } from '../../hooks/useTournament';
 import { useUIStore } from '../../store/uiStore';
 
 type SortColumn = 'team' | 'position' | 'delta_per_share' | 'total_delta';
@@ -12,6 +12,8 @@ interface GamePanelProps {
 
 export function GamePanel({ team1, team2 }: GamePanelProps) {
   const { data: impact, isLoading } = useGameImpact(team1, team2);
+  const { data: bracket } = useBracket();
+  const addGameMutation = useAddCompletedGame();
   const selectGame = useUIStore((state) => state.selectGame);
   const selectTeam = useUIStore((state) => state.selectTeam);
   const [sortColumn, setSortColumn] = useState<SortColumn>('total_delta');
@@ -23,6 +25,20 @@ export function GamePanel({ team1, team2 }: GamePanelProps) {
     } else {
       setSortColumn(column);
       setSortDirection('desc');
+    }
+  };
+
+  // Check if both teams are confirmed to play (neither is eliminated)
+  const eliminatedTeams = new Set(bracket?.eliminated_teams || []);
+  const bothTeamsConfirmed = !eliminatedTeams.has(team1) && !eliminatedTeams.has(team2);
+
+  const handleMarkWinner = async (winner: string, loser: string) => {
+    try {
+      await addGameMutation.mutateAsync({ winner, loser });
+      selectGame(null); // Close the panel after recording
+    } catch (e) {
+      // Error will be shown via mutation state
+      console.error('Failed to record game:', e);
     }
   };
 
@@ -105,6 +121,34 @@ export function GamePanel({ team1, team2 }: GamePanelProps) {
                 <div className="text-xs text-gray-500">{team2} Wins</div>
               </div>
             </div>
+
+            {/* Mark Winner Buttons - shown when both teams confirmed */}
+            {bothTeamsConfirmed && (
+              <div className="border-t border-gray-200 pt-4">
+                <h3 className="text-sm font-medium text-gray-900 mb-3">Record Result</h3>
+                {addGameMutation.isError && (
+                  <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+                    Failed to record result
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => handleMarkWinner(team1, team2)}
+                    disabled={addGameMutation.isPending}
+                    className="px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {addGameMutation.isPending ? 'Recording...' : `${team1} Won`}
+                  </button>
+                  <button
+                    onClick={() => handleMarkWinner(team2, team1)}
+                    disabled={addGameMutation.isPending}
+                    className="px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {addGameMutation.isPending ? 'Recording...' : `${team2} Won`}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Portfolio Impact */}
             <div className="border-t border-gray-200 pt-4">

@@ -3,8 +3,9 @@ import { PortfolioSummary } from './PortfolioSummary';
 import { TeamsTable } from './TeamsTable';
 import { BracketView } from '../Bracket/BracketView';
 import { WhatIfTool } from '../WhatIf';
+import { CompletedGamesView } from '../CompletedGames';
 
-type ViewMode = 'overview' | 'bracket' | 'whatif';
+type ViewMode = 'overview' | 'bracket' | 'whatif' | 'completed';
 
 export function Dashboard() {
   const [viewMode, setViewMode] = useState<ViewMode>('overview');
@@ -43,6 +44,16 @@ export function Dashboard() {
         >
           What-If
         </button>
+        <button
+          onClick={() => setViewMode('completed')}
+          className={`px-4 py-2 text-sm font-medium rounded-lg ${
+            viewMode === 'completed'
+              ? 'bg-blue-600 text-white'
+              : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+          }`}
+        >
+          Completed Games
+        </button>
       </div>
 
       {viewMode === 'overview' && (
@@ -76,6 +87,8 @@ export function Dashboard() {
           </div>
         </div>
       )}
+
+      {viewMode === 'completed' && <CompletedGamesView />}
     </div>
   );
 }
