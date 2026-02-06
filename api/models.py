@@ -1,6 +1,6 @@
 """Pydantic models for API request/response schemas."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class TeamInfo(BaseModel):
@@ -85,7 +85,7 @@ class WhatIfGameOutcome(BaseModel):
 
     team1: str
     team2: str
-    probability: float  # Probability that team1 wins
+    probability: float = Field(ge=0.0, le=1.0)  # Probability that team1 wins
 
 
 class CompletedGame(BaseModel):
@@ -152,7 +152,7 @@ class SetGameOutcomeRequest(BaseModel):
 
     team1: str
     team2: str
-    probability: float
+    probability: float = Field(ge=0.0, le=1.0)
     is_permanent: bool = False
 
 
