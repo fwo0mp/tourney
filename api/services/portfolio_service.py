@@ -54,54 +54,51 @@ class PortfolioService:
         return cls._instance
 
     def _get_cix_client(self):
-        """Get or create CIX client."""
+        """Get or create CIX client.
+
+        Raises ImportError if cix_client module is not installed and USE_MOCK_DATA is not set.
+        """
         if self._cix_client is None and not self._use_mock:
             apid = os.getenv("CIX_APID")
             if apid:
-                try:
-                    import cix_client
-                    self._cix_client = cix_client.CixClient(apid)
-                except ImportError:
-                    pass  # cix_client not available
+                import cix_client
+                self._cix_client = cix_client.CixClient(apid)
         return self._cix_client
 
     def get_positions(self) -> tuple[dict, bool]:
-        """Get current positions. Returns (positions, is_mock)."""
+        """Get current positions. Returns (positions, is_mock).
+
+        Raises if CIX client is configured but fails to fetch positions.
+        """
         if self._use_mock:
             return MOCK_POSITIONS.copy(), True
 
         client = self._get_cix_client()
         if client:
-            try:
-                positions = client.my_positions(full_names=True)
-                # Convert Decimal to float if needed
-                return {k: float(v) for k, v in positions.items()}, False
-            except Exception:
-                pass
+            positions = client.my_positions(full_names=True)
+            # Convert Decimal to float if needed
+            return {k: float(v) for k, v in positions.items()}, False
 
-        # Fallback to mock if CIX unavailable
+        # No CIX_APID configured — use mock data
         return MOCK_POSITIONS.copy(), True
 
     def get_cash_balance(self) -> tuple[float, bool]:
         """Get current cash balance. Returns (cash_balance, is_mock).
 
         Cash balance has zero delta - it doesn't change with team ratings.
+        Raises if CIX client is configured but fails to fetch cash balance.
         """
         if self._use_mock:
             return MOCK_CASH_BALANCE, True
 
         client = self._get_cix_client()
         if client:
-            try:
-                # CIX API will provide cash balance in the future
-                # For now, try to get it from portfolio summary if available
-                portfolio = client.my_portfolio()
-                if hasattr(portfolio, 'cash') and portfolio.cash is not None:
-                    return float(portfolio.cash), False
-            except Exception:
-                pass
+            portfolio = client.my_portfolio()
+            if hasattr(portfolio, 'cash') and portfolio.cash is not None:
+                return float(portfolio.cash), False
+            raise RuntimeError("CIX portfolio response missing cash balance")
 
-        # Fallback to mock if CIX unavailable
+        # No CIX_APID configured — use mock data
         return MOCK_CASH_BALANCE, True
 
     def get_portfolio_value(self, positions: dict = None) -> float:
