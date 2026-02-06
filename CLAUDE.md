@@ -107,6 +107,16 @@ result, is_equivalent, ref_result, diff = tourney.verify_calculate_win_prob(team
 - `OverridesMap` stores probability overrides with automatic handling of team name ordering
 - Scoring uses `ROUND_POINTS = [1, 1, 2, 2, 2, 3]` for standard or `CALCUTTA_POINTS` for calcutta pools
 
+## Deprecation Tracking
+
+When making changes that leave behind deprecated code (e.g., old function signatures kept for backward compatibility, renamed APIs with shims), add a record to `deprecations.md` in the project root with:
+- What is deprecated
+- What replaces it
+- Date added
+- When it can be removed (e.g., "after all callers migrated")
+
+This ensures deprecated code gets cleaned up and doesn't accumulate.
+
 ## Ad Hoc UI Testing with Selenium
 
 For debugging frontend issues, use Selenium to automate browser interactions and capture console logs:
