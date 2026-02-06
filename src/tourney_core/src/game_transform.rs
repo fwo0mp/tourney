@@ -47,22 +47,28 @@ pub fn game_transform_prob(
 ///
 /// If the game has multiple teams (play-in), picks a winner weighted by probability.
 /// If the game has one team, returns that team's name.
+/// Keys are sorted to ensure deterministic results for a given RNG seed.
 fn resolve_game_to_winner<R: Rng>(game: &HashMap<String, f64>, rng: &mut R) -> String {
     if game.len() == 1 {
         return game.keys().next().unwrap().clone();
     }
 
-    // Multiple teams - pick weighted by probability
+    // Sort entries by key for deterministic iteration order
+    let mut entries: Vec<(&String, &f64)> = game.iter().collect();
+    entries.sort_by_key(|(name, _)| (*name).clone());
+
     let r: f64 = rng.gen();
     let mut cumulative = 0.0;
-    for (name, &prob) in game.iter() {
+    let mut last_name = entries[0].0;
+    for (name, &prob) in &entries {
         cumulative += prob;
+        last_name = name;
         if r < cumulative {
-            return name.clone();
+            return (*name).clone();
         }
     }
     // Fallback to last team (shouldn't happen if probabilities sum to 1)
-    game.keys().last().unwrap().clone()
+    last_name.clone()
 }
 
 /// Monte Carlo game simulation.
@@ -198,5 +204,35 @@ mod tests {
         let (winner, prob) = result.iter().next().unwrap();
         assert!(*winner == "A" || *winner == "B");
         assert!((*prob - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_resolve_game_to_winner_deterministic() {
+        use rand::SeedableRng;
+
+        // Play-in game with two teams
+        let mut game = HashMap::new();
+        game.insert("C".to_string(), 0.4);
+        game.insert("A".to_string(), 0.6);
+
+        // Run twice with the same seed - should produce identical results
+        let mut rng1 = rand::rngs::StdRng::seed_from_u64(42);
+        let mut rng2 = rand::rngs::StdRng::seed_from_u64(42);
+
+        let winner1 = resolve_game_to_winner(&game, &mut rng1);
+        let winner2 = resolve_game_to_winner(&game, &mut rng2);
+        assert_eq!(winner1, winner2, "Same seed must produce same winner");
+
+        // Run many times and verify distribution is reasonable
+        let mut a_wins = 0;
+        let n = 10000;
+        let mut rng = rand::rngs::StdRng::seed_from_u64(123);
+        for _ in 0..n {
+            if resolve_game_to_winner(&game, &mut rng) == "A" {
+                a_wins += 1;
+            }
+        }
+        let a_ratio = a_wins as f64 / n as f64;
+        assert!((a_ratio - 0.6).abs() < 0.05, "A should win ~60% of the time, got {}", a_ratio);
     }
 }
