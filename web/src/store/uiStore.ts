@@ -224,6 +224,9 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   setGameOutcomes: (outcomes, isPermanent) => {
     const prevWhatIf = get().whatIf;
+    const oldOutcomes = isPermanent
+      ? prevWhatIf.permanentGameOutcomes
+      : prevWhatIf.scenarioGameOutcomes;
 
     set((state) => ({
       monteCarloStale: true,
@@ -232,12 +235,21 @@ export const useUIStore = create<UIState>((set, get) => ({
         : { ...state.whatIf, scenarioGameOutcomes: outcomes },
     }));
 
-    // Persist all outcomes, rollback entirely if any fail
-    Promise.all(
-      outcomes.map((o) =>
+    // Diff old vs new to find removed outcomes
+    const newKeys = new Set(outcomes.map((o) => `${o.team1}|${o.team2}`));
+    const removedOutcomes = oldOutcomes.filter(
+      (o) => !newKeys.has(`${o.team1}|${o.team2}`)
+    );
+
+    // Persist additions/updates and removals, rollback on failure
+    Promise.all([
+      ...outcomes.map((o) =>
         analysisApi.setWhatIfGameOutcome(o.team1, o.team2, o.probability, isPermanent)
-      )
-    ).catch((e) => {
+      ),
+      ...removedOutcomes.map((o) =>
+        analysisApi.removeWhatIfGameOutcome(o.team1, o.team2, isPermanent)
+      ),
+    ]).catch((e) => {
       console.error('Failed to persist game outcomes, rolling back:', e);
       set({ whatIf: prevWhatIf });
     });
