@@ -114,60 +114,6 @@ class TournamentService:
             "expected_score": self.scores.get(team_name, 0.0),
         }
 
-    def get_all_teams(self) -> list[dict]:
-        """Get info for all teams in the tournament."""
-        self.ensure_loaded()
-        teams = []
-        for team_name in self.state.get_bracket_teams():
-            team = self.ratings.get(team_name)
-            if team:
-                teams.append({
-                    "name": team.name,
-                    "offense": team.offense,
-                    "defense": team.defense,
-                    "tempo": team.tempo,
-                    "expected_score": self.scores.get(team_name, 0.0),
-                })
-        return teams
-
-    def get_bracket_structure(self) -> dict:
-        """Get bracket structure for visualization."""
-        self.ensure_loaded()
-        bracket = self.state.bracket
-        num_teams = len(bracket)
-
-        # Determine number of rounds
-        import math
-        num_rounds = int(math.log2(num_teams))
-
-        games = []
-        for i, game in enumerate(bracket):
-            # Determine region based on position (for 64 teams)
-            if num_teams == 64:
-                if i < 16:
-                    region = "South"
-                elif i < 32:
-                    region = "East"
-                elif i < 48:
-                    region = "Midwest"
-                else:
-                    region = "West"
-            else:
-                region = None
-
-            games.append({
-                "id": f"game_{i}",
-                "round": 0,  # Initial round
-                "region": region,
-                "teams": game,
-            })
-
-        return {
-            "games": games,
-            "num_teams": num_teams,
-            "num_rounds": num_rounds,
-        }
-
     def calculate_win_prob(self, team1_name: str, team2_name: str) -> float:
         """Calculate win probability for a matchup."""
         self.ensure_loaded()

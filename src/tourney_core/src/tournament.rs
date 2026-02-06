@@ -300,4 +300,3 @@ mod tests {
         assert!(teams.contains(&"D".to_string()));
     }
 }
-// Test method to verify compilation

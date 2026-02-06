@@ -31,7 +31,6 @@ export const analysisApi = {
     api.post<Scenario>('/analysis/scenarios', { name, description }),
   deleteScenario: (scenarioId: number) =>
     api.delete<{ success: boolean }>(`/analysis/scenarios/${scenarioId}`),
-  getActiveScenario: () => api.get<Scenario | null>('/analysis/scenarios/active'),
   setActiveScenario: (scenarioId: number | null) =>
     api.put<{ success: boolean }>('/analysis/scenarios/active', { scenario_id: scenarioId }),
 

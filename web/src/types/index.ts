@@ -119,19 +119,6 @@ export interface WhatIfResponse {
   modified_scores: Record<string, number>;
 }
 
-export interface OrderbookLevel {
-  price: number;
-  size: number;
-}
-
-export interface OrderbookResponse {
-  team: string;
-  bids: OrderbookLevel[];
-  asks: OrderbookLevel[];
-  is_mock: boolean;
-  error?: string;
-}
-
 export interface SlotCandidate {
   team: string;
   probability: number;
