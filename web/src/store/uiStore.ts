@@ -175,156 +175,120 @@ export const useUIStore = create<UIState>((set, get) => ({
       ? [team1, team2, probability]
       : [team2, team1, 1.0 - probability];
 
-    // Update local state
+    // Capture pre-update state for rollback
+    const prevWhatIf = get().whatIf;
+
+    // Optimistic update
     set((state) => {
-      if (isPermanent) {
-        return {
-          monteCarloStale: true,
-          whatIf: {
-            ...state.whatIf,
-            permanentGameOutcomes: [
-              ...state.whatIf.permanentGameOutcomes.filter(
-                (o) => !((o.team1 === t1 && o.team2 === t2) || (o.team1 === t2 && o.team2 === t1))
-              ),
-              { team1: t1, team2: t2, probability: prob },
-            ],
-          },
-        };
-      } else {
-        return {
-          monteCarloStale: true,
-          whatIf: {
-            ...state.whatIf,
-            scenarioGameOutcomes: [
-              ...state.whatIf.scenarioGameOutcomes.filter(
-                (o) => !((o.team1 === t1 && o.team2 === t2) || (o.team1 === t2 && o.team2 === t1))
-              ),
-              { team1: t1, team2: t2, probability: prob },
-            ],
-          },
-        };
-      }
+      const key = isPermanent ? 'permanentGameOutcomes' : 'scenarioGameOutcomes';
+      return {
+        monteCarloStale: true,
+        whatIf: {
+          ...state.whatIf,
+          [key]: [
+            ...state.whatIf[key].filter(
+              (o) => !((o.team1 === t1 && o.team2 === t2) || (o.team1 === t2 && o.team2 === t1))
+            ),
+            { team1: t1, team2: t2, probability: prob },
+          ],
+        },
+      };
     });
-    // Persist to backend
-    analysisApi.setWhatIfGameOutcome(t1, t2, prob, isPermanent).catch((e) =>
-      console.error('Failed to persist game outcome:', e)
-    );
+
+    // Persist to backend, rollback on failure
+    analysisApi.setWhatIfGameOutcome(t1, t2, prob, isPermanent).catch((e) => {
+      console.error('Failed to persist game outcome, rolling back:', e);
+      set({ whatIf: prevWhatIf });
+    });
   },
 
   removeGameOutcome: (team1, team2, isPermanent) => {
     // Normalize to lexicographic order
     const [t1, t2] = team1 < team2 ? [team1, team2] : [team2, team1];
 
-    // Update local state
+    const prevWhatIf = get().whatIf;
+
     set((state) => {
-      if (isPermanent) {
-        return {
-          monteCarloStale: true,
-          whatIf: {
-            ...state.whatIf,
-            permanentGameOutcomes: state.whatIf.permanentGameOutcomes.filter(
-              (o) => !(o.team1 === t1 && o.team2 === t2)
-            ),
-          },
-        };
-      } else {
-        return {
-          monteCarloStale: true,
-          whatIf: {
-            ...state.whatIf,
-            scenarioGameOutcomes: state.whatIf.scenarioGameOutcomes.filter(
-              (o) => !(o.team1 === t1 && o.team2 === t2)
-            ),
-          },
-        };
-      }
+      const key = isPermanent ? 'permanentGameOutcomes' : 'scenarioGameOutcomes';
+      return {
+        monteCarloStale: true,
+        whatIf: {
+          ...state.whatIf,
+          [key]: state.whatIf[key].filter(
+            (o) => !(o.team1 === t1 && o.team2 === t2)
+          ),
+        },
+      };
     });
-    // Persist to backend
-    analysisApi.removeWhatIfGameOutcome(t1, t2, isPermanent).catch((e) =>
-      console.error('Failed to remove game outcome:', e)
-    );
+
+    analysisApi.removeWhatIfGameOutcome(t1, t2, isPermanent).catch((e) => {
+      console.error('Failed to remove game outcome, rolling back:', e);
+      set({ whatIf: prevWhatIf });
+    });
   },
 
   setGameOutcomes: (outcomes, isPermanent) => {
-    // Update local state
+    const prevWhatIf = get().whatIf;
+
     set((state) => ({
       monteCarloStale: true,
       whatIf: isPermanent
         ? { ...state.whatIf, permanentGameOutcomes: outcomes }
         : { ...state.whatIf, scenarioGameOutcomes: outcomes },
     }));
-    // Persist each outcome to backend
-    for (const outcome of outcomes) {
-      analysisApi.setWhatIfGameOutcome(outcome.team1, outcome.team2, outcome.probability, isPermanent).catch((e) =>
-        console.error('Failed to persist game outcome:', e)
-      );
-    }
+
+    // Persist all outcomes, rollback entirely if any fail
+    Promise.all(
+      outcomes.map((o) =>
+        analysisApi.setWhatIfGameOutcome(o.team1, o.team2, o.probability, isPermanent)
+      )
+    ).catch((e) => {
+      console.error('Failed to persist game outcomes, rolling back:', e);
+      set({ whatIf: prevWhatIf });
+    });
   },
 
   setRatingAdjustment: (team, delta, isPermanent = false) => {
-    // Update local state
+    const prevWhatIf = get().whatIf;
+
     set((state) => {
-      if (isPermanent) {
-        return {
-          monteCarloStale: true,
-          whatIf: {
-            ...state.whatIf,
-            permanentRatingAdjustments: {
-              ...state.whatIf.permanentRatingAdjustments,
-              [team]: delta,
-            },
-          },
-        };
-      } else {
-        return {
-          monteCarloStale: true,
-          whatIf: {
-            ...state.whatIf,
-            scenarioRatingAdjustments: {
-              ...state.whatIf.scenarioRatingAdjustments,
-              [team]: delta,
-            },
-          },
-        };
-      }
+      const key = isPermanent ? 'permanentRatingAdjustments' : 'scenarioRatingAdjustments';
+      return {
+        monteCarloStale: true,
+        whatIf: {
+          ...state.whatIf,
+          [key]: { ...state.whatIf[key], [team]: delta },
+        },
+      };
     });
-    // Persist to backend
-    analysisApi.setWhatIfRatingAdjustment(team, delta, isPermanent).catch((e) =>
-      console.error('Failed to persist rating adjustment:', e)
-    );
+
+    analysisApi.setWhatIfRatingAdjustment(team, delta, isPermanent).catch((e) => {
+      console.error('Failed to persist rating adjustment, rolling back:', e);
+      set({ whatIf: prevWhatIf });
+    });
   },
 
   removeRatingAdjustment: (team, isPermanent) => {
-    // Update local state
+    const prevWhatIf = get().whatIf;
+
     set((state) => {
-      if (isPermanent) {
-        const { [team]: _, ...rest } = state.whatIf.permanentRatingAdjustments;
-        return {
-          monteCarloStale: true,
-          whatIf: {
-            ...state.whatIf,
-            permanentRatingAdjustments: rest,
-          },
-        };
-      } else {
-        const { [team]: _, ...rest } = state.whatIf.scenarioRatingAdjustments;
-        return {
-          monteCarloStale: true,
-          whatIf: {
-            ...state.whatIf,
-            scenarioRatingAdjustments: rest,
-          },
-        };
-      }
+      const key = isPermanent ? 'permanentRatingAdjustments' : 'scenarioRatingAdjustments';
+      const { [team]: _, ...rest } = state.whatIf[key];
+      return {
+        monteCarloStale: true,
+        whatIf: { ...state.whatIf, [key]: rest },
+      };
     });
-    // Persist to backend
-    analysisApi.removeWhatIfRatingAdjustment(team, isPermanent).catch((e) =>
-      console.error('Failed to remove rating adjustment:', e)
-    );
+
+    analysisApi.removeWhatIfRatingAdjustment(team, isPermanent).catch((e) => {
+      console.error('Failed to remove rating adjustment, rolling back:', e);
+      set({ whatIf: prevWhatIf });
+    });
   },
 
   clearTemporaryOverrides: () => {
-    // Update local state - only clear scenario overrides
+    const prevWhatIf = get().whatIf;
+
     set((state) => ({
       monteCarloStale: true,
       whatIf: {
@@ -333,14 +297,16 @@ export const useUIStore = create<UIState>((set, get) => ({
         scenarioRatingAdjustments: {},
       },
     }));
-    // Persist to backend
-    analysisApi.clearTemporaryOverrides().catch((e) =>
-      console.error('Failed to clear temporary overrides:', e)
-    );
+
+    analysisApi.clearTemporaryOverrides().catch((e) => {
+      console.error('Failed to clear temporary overrides, rolling back:', e);
+      set({ whatIf: prevWhatIf });
+    });
   },
 
   clearWhatIf: () => {
-    // Update local state - clear everything
+    const prevWhatIf = get().whatIf;
+
     set((state) => ({
       monteCarloStale: false,
       whatIf: {
@@ -351,10 +317,11 @@ export const useUIStore = create<UIState>((set, get) => ({
         scenarioRatingAdjustments: {},
       },
     }));
-    // Persist to backend
-    analysisApi.clearWhatIfState().catch((e) =>
-      console.error('Failed to clear what-if state:', e)
-    );
+
+    analysisApi.clearWhatIfState().catch((e) => {
+      console.error('Failed to clear what-if state, rolling back:', e);
+      set({ whatIf: prevWhatIf });
+    });
   },
 
   promoteGameOutcome: async (team1, team2) => {
