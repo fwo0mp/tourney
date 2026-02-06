@@ -5,7 +5,8 @@ from pathlib import Path
 from contextlib import contextmanager
 from typing import Optional
 
-DATABASE_PATH = Path("tourney.db")
+# Store database alongside the api package (project root)
+DATABASE_PATH = Path(__file__).resolve().parent.parent / "tourney.db"
 
 
 def init_db():
