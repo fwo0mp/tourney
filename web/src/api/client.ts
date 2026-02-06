@@ -24,6 +24,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  put: <T>(url: string, data: unknown) =>
+    fetchJson<T>(url, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
   delete: <T>(url: string) =>
     fetchJson<T>(url, {
       method: 'DELETE',
