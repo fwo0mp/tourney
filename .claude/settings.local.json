@@ -16,7 +16,12 @@
       "Bash(lsof:*)",
       "Bash(nm:*)",
       "Bash(npx tsc:*)",
-      "Bash(npm run typecheck:*)"
+      "Bash(npm run typecheck:*)",
+      "Bash(cargo test:*)",
+      "Bash(git stash:*)",
+      "Bash(git stash pop:*)",
+      "Bash(npx eslint:*)",
+      "Bash(git add:*)"
     ]
   }
 }
