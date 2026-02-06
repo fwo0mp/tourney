@@ -6,15 +6,13 @@ interface ScenarioSelectorProps {
 }
 
 export function ScenarioSelector({ compact = false }: ScenarioSelectorProps) {
-  const {
-    whatIf,
-    scenarios,
-    scenariosLoaded,
-    loadScenarios,
-    createScenario,
-    deleteScenario,
-    setActiveScenario,
-  } = useUIStore();
+  const whatIf = useUIStore((s) => s.whatIf);
+  const scenarios = useUIStore((s) => s.scenarios);
+  const scenariosLoaded = useUIStore((s) => s.scenariosLoaded);
+  const loadScenarios = useUIStore((s) => s.loadScenarios);
+  const createScenario = useUIStore((s) => s.createScenario);
+  const deleteScenario = useUIStore((s) => s.deleteScenario);
+  const setActiveScenario = useUIStore((s) => s.setActiveScenario);
 
   const [isOpen, setIsOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);

@@ -18,12 +18,10 @@ export function OverridesList({
   showPromote = false,
   emptyMessage = 'No overrides',
 }: OverridesListProps) {
-  const {
-    removeGameOutcome,
-    removeRatingAdjustment,
-    promoteGameOutcome,
-    promoteRatingAdjustment,
-  } = useUIStore();
+  const removeGameOutcome = useUIStore((s) => s.removeGameOutcome);
+  const removeRatingAdjustment = useUIStore((s) => s.removeRatingAdjustment);
+  const promoteGameOutcome = useUIStore((s) => s.promoteGameOutcome);
+  const promoteRatingAdjustment = useUIStore((s) => s.promoteRatingAdjustment);
 
   const adjustmentEntries = Object.entries(ratingAdjustments);
   const isEmpty = gameOutcomes.length === 0 && adjustmentEntries.length === 0;
