@@ -51,13 +51,13 @@ def parse_what_if_params(
         try:
             outcomes = json.loads(what_if_outcomes)
         except json.JSONDecodeError:
-            pass
+            raise HTTPException(status_code=400, detail="Invalid JSON in what_if_outcomes parameter")
 
     if what_if_adjustments:
         try:
             adjustments = json.loads(what_if_adjustments)
         except json.JSONDecodeError:
-            pass
+            raise HTTPException(status_code=400, detail="Invalid JSON in what_if_adjustments parameter")
 
     return outcomes, adjustments
 

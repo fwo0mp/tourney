@@ -47,12 +47,12 @@ def get_value(
             try:
                 outcomes = json.loads(what_if_outcomes)
             except json.JSONDecodeError:
-                pass
+                raise HTTPException(status_code=400, detail="Invalid JSON in what_if_outcomes parameter")
         if what_if_adjustments:
             try:
                 adjustments = json.loads(what_if_adjustments)
             except json.JSONDecodeError:
-                pass
+                raise HTTPException(status_code=400, detail="Invalid JSON in what_if_adjustments parameter")
 
         # Get tournament state, optionally with what-if modifications
         state = tournament.get_state()
@@ -95,12 +95,12 @@ def get_distribution(
             try:
                 outcomes = json.loads(what_if_outcomes)
             except json.JSONDecodeError:
-                pass
+                raise HTTPException(status_code=400, detail="Invalid JSON in what_if_outcomes parameter")
         if what_if_adjustments:
             try:
                 adjustments = json.loads(what_if_adjustments)
             except json.JSONDecodeError:
-                pass
+                raise HTTPException(status_code=400, detail="Invalid JSON in what_if_adjustments parameter")
 
         # Get tournament state, optionally with what-if modifications
         state = tournament.get_state()
@@ -188,12 +188,12 @@ def get_hypothetical_value(
             try:
                 outcomes = json.loads(what_if_outcomes)
             except json.JSONDecodeError:
-                pass
+                raise HTTPException(status_code=400, detail="Invalid JSON in what_if_outcomes parameter")
         if what_if_adjustments:
             try:
                 adjustments = json.loads(what_if_adjustments)
             except json.JSONDecodeError:
-                pass
+                raise HTTPException(status_code=400, detail="Invalid JSON in what_if_adjustments parameter")
 
         # Get tournament state with any what-if modifications
         state = tournament.get_state()
