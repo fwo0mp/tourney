@@ -6,7 +6,22 @@
       "Bash(grep:*)",
       "Bash(uv sync:*)",
       "Bash(uv run pytest:*)",
-      "Bash(cargo bench:*)"
+      "Bash(cargo bench:*)",
+      "Bash(USE_MOCK_DATA=true timeout 5 uv run uvicorn:*)",
+      "Bash(pip cache:*)",
+      "Bash(uv run maturin build:*)",
+      "Bash(uv run maturin:*)",
+      "Bash(cargo clean:*)",
+      "Bash(npm run build:*)",
+      "Bash(lsof:*)",
+      "Bash(nm:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(cargo test:*)",
+      "Bash(git stash:*)",
+      "Bash(git stash pop:*)",
+      "Bash(npx eslint:*)",
+      "Bash(git add:*)"
     ]
   }
 }

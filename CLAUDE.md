@@ -106,3 +106,58 @@ result, is_equivalent, ref_result, diff = tourney.verify_calculate_win_prob(team
 - Team name normalization handled by `NAME_CONVERSIONS` dict and `clean_name()` in `get_data.py`
 - `OverridesMap` stores probability overrides with automatic handling of team name ordering
 - Scoring uses `ROUND_POINTS = [1, 1, 2, 2, 2, 3]` for standard or `CALCUTTA_POINTS` for calcutta pools
+
+## Deprecation Tracking
+
+When making changes that leave behind deprecated code (e.g., old function signatures kept for backward compatibility, renamed APIs with shims), add a record to `deprecations.md` in the project root with:
+- What is deprecated
+- What replaces it
+- Date added
+- When it can be removed (e.g., "after all callers migrated")
+
+This ensures deprecated code gets cleaned up and doesn't accumulate.
+
+## Ad Hoc UI Testing with Selenium
+
+For debugging frontend issues, use Selenium to automate browser interactions and capture console logs:
+
+```python
+uv run python << 'EOF'
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+import time
+
+options = Options()
+options.add_argument('--headless')
+options.add_argument('--no-sandbox')
+options.set_capability('goog:loggingPrefs', {'browser': 'ALL'})
+
+driver = webdriver.Chrome(options=options)
+driver.set_window_size(1400, 900)
+
+try:
+    driver.get("http://localhost:5174")  # Frontend dev server
+    time.sleep(3)
+
+    # Find and click elements
+    button = driver.find_element(By.XPATH, "//button[contains(text(), 'What-If')]")
+    button.click()
+    time.sleep(1)
+
+    # Capture console logs (useful for debugging)
+    for entry in driver.get_log('browser'):
+        print(f"{entry['level']}: {entry['message']}")
+
+    # Take screenshots
+    driver.save_screenshot('/tmp/screenshot.png')
+finally:
+    driver.quit()
+EOF
+```
+
+This is particularly useful for:
+- Verifying click handlers are triggered
+- Checking console.log output from React components
+- Debugging API call failures that only happen in the browser
+- Testing UI state changes after user interactions

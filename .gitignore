@@ -39,9 +39,19 @@ tourney_env
 .env
 .venv
 
+# SQLite database
+tourney.db
+
 # Rust build outputs
 target/
 Cargo.lock
 *.dylib
 *.dll
 *.pyd
+
+# Frontend build outputs
+web/node_modules/
+web/dist/
+web/.vite/
+web/*.local
+web/.tsbuildinfo
