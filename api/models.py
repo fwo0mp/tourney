@@ -113,10 +113,63 @@ class WhatIfResponse(BaseModel):
 
 
 class WhatIfStateResponse(BaseModel):
-    """Persisted what-if state."""
+    """Persisted what-if state with permanent and scenario separation."""
 
-    game_outcomes: list[WhatIfGameOutcome] = []
-    rating_adjustments: dict[str, float] = {}
+    # Permanent overrides (always applied)
+    permanent_game_outcomes: list[WhatIfGameOutcome] = []
+    permanent_rating_adjustments: dict[str, float] = {}
+    # Scenario-specific overrides (only when scenario is active)
+    scenario_game_outcomes: list[WhatIfGameOutcome] = []
+    scenario_rating_adjustments: dict[str, float] = {}
+    # Active scenario info
+    active_scenario_id: int | None = None
+    active_scenario_name: str | None = None
+
+
+class Scenario(BaseModel):
+    """A named scenario for what-if analysis."""
+
+    id: int
+    name: str
+    description: str | None = None
+
+
+class CreateScenarioRequest(BaseModel):
+    """Request to create a new scenario."""
+
+    name: str
+    description: str | None = None
+
+
+class SetActiveScenarioRequest(BaseModel):
+    """Request to set the active scenario."""
+
+    scenario_id: int | None = None  # None = Default (no scenario)
+
+
+class SetGameOutcomeRequest(BaseModel):
+    """Request to set a game outcome override."""
+
+    team1: str
+    team2: str
+    probability: float
+    is_permanent: bool = False
+
+
+class SetRatingAdjustmentRequest(BaseModel):
+    """Request to set a rating adjustment override."""
+
+    team: str
+    adjustment: float
+    is_permanent: bool = False
+
+
+class PromoteOverrideRequest(BaseModel):
+    """Request to promote a scenario override to permanent."""
+
+    team1: str | None = None  # For game outcomes
+    team2: str | None = None  # For game outcomes
+    team: str | None = None  # For rating adjustments
 
 
 class BracketGame(BaseModel):

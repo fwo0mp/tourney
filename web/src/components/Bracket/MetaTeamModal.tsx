@@ -17,6 +17,7 @@ export function MetaTeamModal({ nodeId, onClose }: MetaTeamModalProps) {
   const setGameOutcome = useUIStore((state) => state.setGameOutcome);
   const removeGameOutcome = useUIStore((state) => state.removeGameOutcome);
   const setGameOutcomes = useUIStore((state) => state.setGameOutcomes);
+  const promoteGameOutcome = useUIStore((state) => state.promoteGameOutcome);
   const { data: treeResponse } = useBracketTree();
 
   // Parse round/position from nodeId for API compatibility
@@ -61,15 +62,36 @@ export function MetaTeamModal({ nodeId, onClose }: MetaTeamModalProps) {
     matchupTeams?.team2 ?? null
   );
 
-  // Find existing override for this matchup
-  const existingOverride = useMemo(() => {
-    if (!matchupTeams) return null;
+  // Combine all game outcomes for finding overrides
+  const allGameOutcomes = useMemo(() => [
+    ...whatIf.permanentGameOutcomes,
+    ...whatIf.scenarioGameOutcomes,
+  ], [whatIf.permanentGameOutcomes, whatIf.scenarioGameOutcomes]);
+
+  // Find existing override for this matchup and determine if it's permanent or scenario
+  const { existingOverride, isOverridePermanent, isOverrideInScenario } = useMemo(() => {
+    if (!matchupTeams) return { existingOverride: null, isOverridePermanent: false, isOverrideInScenario: false };
     const { team1, team2 } = matchupTeams;
     const [t1, t2] = team1 < team2 ? [team1, team2] : [team2, team1];
-    return whatIf.gameOutcomes.find(
+
+    // Check permanent first
+    const permOverride = whatIf.permanentGameOutcomes.find(
       (o) => o.team1 === t1 && o.team2 === t2
     );
-  }, [matchupTeams, whatIf.gameOutcomes]);
+    if (permOverride) {
+      return { existingOverride: permOverride, isOverridePermanent: true, isOverrideInScenario: false };
+    }
+
+    // Check scenario
+    const scenarioOverride = whatIf.scenarioGameOutcomes.find(
+      (o) => o.team1 === t1 && o.team2 === t2
+    );
+    if (scenarioOverride) {
+      return { existingOverride: scenarioOverride, isOverridePermanent: false, isOverrideInScenario: true };
+    }
+
+    return { existingOverride: null, isOverridePermanent: false, isOverrideInScenario: false };
+  }, [matchupTeams, whatIf.permanentGameOutcomes, whatIf.scenarioGameOutcomes]);
 
   // Probability state for slider (team1's win probability)
   const [probability, setProbability] = useState<number>(50);
@@ -106,18 +128,19 @@ export function MetaTeamModal({ nodeId, onClose }: MetaTeamModalProps) {
   const selectedTeam = data?.candidates.find((c) => c.probability >= 0.9999);
   const relevantOutcomes = useMemo(() => {
     if (!selectedTeam) return [];
-    return whatIf.gameOutcomes.filter(
+    return allGameOutcomes.filter(
       (o) => (o.team1 === selectedTeam.team || o.team2 === selectedTeam.team) &&
              (o.probability >= 0.9999 || o.probability <= 0.0001)
     );
-  }, [selectedTeam, whatIf.gameOutcomes]);
+  }, [selectedTeam, allGameOutcomes]);
 
   const hasWhatIfSelection = selectedTeam && relevantOutcomes.length > 0;
 
   const handleClearSelection = () => {
     if (!selectedTeam) return;
     // Remove all what-if outcomes where this team won definitively
-    const newOutcomes = whatIf.gameOutcomes.filter((o) => {
+    // Note: This clears from scenario outcomes. For simplicity, we filter scenario outcomes only.
+    const newOutcomes = whatIf.scenarioGameOutcomes.filter((o) => {
       const isTeam1 = o.team1 === selectedTeam.team;
       const isTeam2 = o.team2 === selectedTeam.team;
       if (!isTeam1 && !isTeam2) return true;
@@ -126,7 +149,7 @@ export function MetaTeamModal({ nodeId, onClose }: MetaTeamModalProps) {
       if (isTeam2 && o.probability <= 0.0001) return false;
       return true;
     });
-    setGameOutcomes(newOutcomes);
+    setGameOutcomes(newOutcomes, false); // false = scenario outcomes
   };
 
   const computePathMutation = useMutation({
@@ -135,10 +158,10 @@ export function MetaTeamModal({ nodeId, onClose }: MetaTeamModalProps) {
         team,
         round,
         position,
-        current_outcomes: whatIf.gameOutcomes,
+        current_outcomes: allGameOutcomes,
       }),
     onSuccess: (response) => {
-      const existingOutcomes = whatIf.gameOutcomes;
+      const existingOutcomes = whatIf.scenarioGameOutcomes;
       const newOutcomes = response.required_outcomes;
       const outcomeMap = new Map<string, WhatIfGameOutcome>();
 
@@ -151,7 +174,7 @@ export function MetaTeamModal({ nodeId, onClose }: MetaTeamModalProps) {
         outcomeMap.set(key, outcome);
       }
 
-      setGameOutcomes(Array.from(outcomeMap.values()));
+      setGameOutcomes(Array.from(outcomeMap.values()), false); // false = scenario outcomes
       onClose();
     },
   });
@@ -203,7 +226,12 @@ export function MetaTeamModal({ nodeId, onClose }: MetaTeamModalProps) {
   const handleClearOverride = () => {
     if (!matchupTeams) return;
     const { team1, team2 } = matchupTeams;
-    removeGameOutcome(team1, team2);
+    const [t1, t2] = team1 < team2 ? [team1, team2] : [team2, team1];
+    // Check if it's in permanent or scenario
+    const inPermanent = whatIf.permanentGameOutcomes.some(
+      (o) => o.team1 === t1 && o.team2 === t2
+    );
+    removeGameOutcome(team1, team2, inPermanent);
     // Reset to model prediction
     if (gameImpact) {
       setProbability(gameImpact.win_prob * 100);
@@ -245,18 +273,50 @@ export function MetaTeamModal({ nodeId, onClose }: MetaTeamModalProps) {
 
         {/* Override indicator */}
         {existingOverride && (
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-amber-800">
-                Override active
-              </span>
+          <div className={`p-3 rounded-lg border ${
+            isOverridePermanent
+              ? 'bg-purple-50 border-purple-200'
+              : 'bg-blue-50 border-blue-200'
+          }`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                  isOverridePermanent
+                    ? 'bg-purple-200 text-purple-800'
+                    : 'bg-blue-200 text-blue-800'
+                }`}>
+                  {isOverridePermanent ? 'Permanent' : whatIf.activeScenarioName || 'Ad-hoc'}
+                </span>
+                <span className={`text-sm ${isOverridePermanent ? 'text-purple-800' : 'text-blue-800'}`}>
+                  Override active
+                </span>
+              </div>
               <button
                 onClick={handleClearOverride}
-                className="px-3 py-1.5 text-sm font-medium text-amber-700 bg-amber-100 rounded hover:bg-amber-200"
+                className={`px-2 py-1 text-xs font-medium rounded ${
+                  isOverridePermanent
+                    ? 'text-purple-700 bg-purple-100 hover:bg-purple-200'
+                    : 'text-blue-700 bg-blue-100 hover:bg-blue-200'
+                }`}
               >
                 Clear
               </button>
             </div>
+            {isOverrideInScenario && (
+              <button
+                onClick={() => {
+                  if (matchupTeams) {
+                    promoteGameOutcome(matchupTeams.team1, matchupTeams.team2);
+                  }
+                }}
+                className="w-full mt-1 px-2 py-1.5 text-xs font-medium text-purple-700 bg-purple-100 border border-purple-300 rounded hover:bg-purple-200 flex items-center justify-center gap-1"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                </svg>
+                Make Permanent
+              </button>
+            )}
           </div>
         )}
 

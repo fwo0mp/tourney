@@ -156,8 +156,22 @@ export interface ComputePathResponse {
 }
 
 export interface WhatIfState {
-  gameOutcomes: WhatIfGameOutcome[];
-  ratingAdjustments: Record<string, number>;
+  // Permanent overrides (always applied)
+  permanentGameOutcomes: WhatIfGameOutcome[];
+  permanentRatingAdjustments: Record<string, number>;
+  // Scenario-specific overrides (only when scenario is active)
+  scenarioGameOutcomes: WhatIfGameOutcome[];
+  scenarioRatingAdjustments: Record<string, number>;
+  // Active scenario info
+  activeScenarioId: number | null;
+  activeScenarioName: string | null;
+}
+
+// Scenario for what-if analysis
+export interface Scenario {
+  id: number;
+  name: string;
+  description: string | null;
 }
 
 // View modes for Dashboard tabs

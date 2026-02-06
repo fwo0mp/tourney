@@ -18,6 +18,7 @@ export function TeamPanel({ teamName }: TeamPanelProps) {
   const whatIf = useUIStore((state) => state.whatIf);
   const setRatingAdjustment = useUIStore((state) => state.setRatingAdjustment);
   const removeRatingAdjustment = useUIStore((state) => state.removeRatingAdjustment);
+  const promoteRatingAdjustment = useUIStore((state) => state.promoteRatingAdjustment);
   const [sortColumn, setSortColumn] = useState<SortColumn>('portfolio_impact');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [adjustmentInput, setAdjustmentInput] = useState<string>('');
@@ -25,7 +26,11 @@ export function TeamPanel({ teamName }: TeamPanelProps) {
   const isLoading = teamLoading || impactLoading;
 
   // Get current rating adjustment for this team (if any)
-  const currentAdjustment = whatIf.ratingAdjustments[teamName] ?? null;
+  // Check both permanent and scenario adjustments
+  const permanentAdjustment = whatIf.permanentRatingAdjustments[teamName];
+  const scenarioAdjustment = whatIf.scenarioRatingAdjustments[teamName];
+  const currentAdjustment = scenarioAdjustment ?? permanentAdjustment ?? null;
+  const isPermanentAdjustment = permanentAdjustment !== undefined && scenarioAdjustment === undefined;
 
   const handleSetAdjustment = () => {
     const value = parseFloat(adjustmentInput);
@@ -36,15 +41,17 @@ export function TeamPanel({ teamName }: TeamPanelProps) {
   };
 
   const handleRemoveAdjustment = () => {
-    removeRatingAdjustment(teamName);
+    removeRatingAdjustment(teamName, isPermanentAdjustment);
   };
 
   const handleQuickAdjust = (delta: number) => {
     const newValue = (currentAdjustment ?? 0) + delta;
     if (newValue === 0) {
-      removeRatingAdjustment(teamName);
+      // Remove the adjustment (from permanent if it was permanent, otherwise scenario)
+      removeRatingAdjustment(teamName, isPermanentAdjustment);
     } else {
-      setRatingAdjustment(teamName, newValue);
+      // New adjustments go to scenario by default
+      setRatingAdjustment(teamName, newValue, false);
     }
   };
 
@@ -141,19 +148,53 @@ export function TeamPanel({ teamName }: TeamPanelProps) {
 
               {currentAdjustment !== null ? (
                 <div className="mb-3">
-                  <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg p-3">
-                    <div>
-                      <span className="text-sm text-amber-800">Current adjustment: </span>
-                      <span className={`text-lg font-bold ${currentAdjustment > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {currentAdjustment > 0 ? '+' : ''}{currentAdjustment.toFixed(1)} pts
-                      </span>
+                  <div className={`rounded-lg p-3 border ${
+                    isPermanentAdjustment
+                      ? 'bg-purple-50 border-purple-200'
+                      : 'bg-blue-50 border-blue-200'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                          isPermanentAdjustment
+                            ? 'bg-purple-200 text-purple-800'
+                            : 'bg-blue-200 text-blue-800'
+                        }`}>
+                          {isPermanentAdjustment ? 'Permanent' : whatIf.activeScenarioName || 'Ad-hoc'}
+                        </span>
+                      </div>
+                      <button
+                        onClick={handleRemoveAdjustment}
+                        className={`text-sm font-medium ${
+                          isPermanentAdjustment
+                            ? 'text-purple-600 hover:text-purple-800'
+                            : 'text-blue-600 hover:text-blue-800'
+                        }`}
+                      >
+                        Clear
+                      </button>
                     </div>
-                    <button
-                      onClick={handleRemoveAdjustment}
-                      className="text-amber-600 hover:text-amber-800 text-sm font-medium"
-                    >
-                      Clear
-                    </button>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className={`text-sm ${isPermanentAdjustment ? 'text-purple-800' : 'text-blue-800'}`}>
+                          Adjustment:{' '}
+                        </span>
+                        <span className={`text-lg font-bold ${currentAdjustment > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {currentAdjustment > 0 ? '+' : ''}{currentAdjustment.toFixed(1)} pts
+                        </span>
+                      </div>
+                    </div>
+                    {!isPermanentAdjustment && scenarioAdjustment !== undefined && (
+                      <button
+                        onClick={() => promoteRatingAdjustment(teamName)}
+                        className="w-full mt-2 px-2 py-1.5 text-xs font-medium text-purple-700 bg-purple-100 border border-purple-300 rounded hover:bg-purple-200 flex items-center justify-center gap-1"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                        </svg>
+                        Make Permanent
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : (

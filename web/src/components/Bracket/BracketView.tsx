@@ -207,7 +207,8 @@ function RegionBracket({
     // Compute which teams are in later round slots based on completed games and what-if outcomes
     // Completed games take priority over what-if outcomes
     const completedSlotMap = buildSlotMapFromOutcomes(games, completedGames);
-    const whatIfSlotMap = buildSlotMapFromOutcomes(games, whatIf.gameOutcomes);
+    const allGameOutcomes = [...whatIf.permanentGameOutcomes, ...whatIf.scenarioGameOutcomes];
+    const whatIfSlotMap = buildSlotMapFromOutcomes(games, allGameOutcomes);
 
     // Build slots from games - each game has one team (or multiple for play-in)
     // For a 16-team region, we have 16 slots in round 0
@@ -231,7 +232,7 @@ function RegionBracket({
         playInWinners.set(slotIdx, completedOutcome.winner);
       } else {
         // Check what-if outcomes (new format: team1/team2/probability)
-        const whatIfOutcome = whatIf.gameOutcomes.find(
+        const whatIfOutcome = allGameOutcomes.find(
           g => {
             const [t1, t2] = g.team1 < g.team2 ? [g.team1, g.team2] : [g.team2, g.team1];
             const [p1, p2] = playIn.team1 < playIn.team2 ? [playIn.team1, playIn.team2] : [playIn.team2, playIn.team1];
@@ -1457,7 +1458,9 @@ export function BracketView() {
   };
 
   // Check if any what-if scenarios are active
-  const hasWhatIfActive = whatIf.gameOutcomes.length > 0 || Object.keys(whatIf.ratingAdjustments).length > 0;
+  const permanentCount = whatIf.permanentGameOutcomes.length + Object.keys(whatIf.permanentRatingAdjustments).length;
+  const scenarioCount = whatIf.scenarioGameOutcomes.length + Object.keys(whatIf.scenarioRatingAdjustments).length;
+  const hasWhatIfActive = permanentCount > 0 || scenarioCount > 0;
 
   return (
     <div ref={containerRef} className="bg-white rounded-lg shadow p-6 overflow-x-auto">
@@ -1477,7 +1480,7 @@ export function BracketView() {
           </select>
           {hasWhatIfActive && (
             <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-              Scenario Active ({whatIf.gameOutcomes.length} game{whatIf.gameOutcomes.length !== 1 ? 's' : ''})
+              Overrides Active ({permanentCount + scenarioCount})
             </span>
           )}
         </div>

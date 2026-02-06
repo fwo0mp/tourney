@@ -3,12 +3,23 @@ import type { TeamInfo, BracketResponse, BracketTreeResponse, WhatIfState, Compl
 
 function encodeWhatIfParams(whatIf: WhatIfState | null): string {
   if (!whatIf) return '';
+
+  // Combine permanent and scenario overrides
+  const allOutcomes = [
+    ...whatIf.permanentGameOutcomes,
+    ...whatIf.scenarioGameOutcomes,
+  ];
+  const allAdjustments = {
+    ...whatIf.permanentRatingAdjustments,
+    ...whatIf.scenarioRatingAdjustments,
+  };
+
   const params = new URLSearchParams();
-  if (whatIf.gameOutcomes.length > 0) {
-    params.set('what_if_outcomes', JSON.stringify(whatIf.gameOutcomes));
+  if (allOutcomes.length > 0) {
+    params.set('what_if_outcomes', JSON.stringify(allOutcomes));
   }
-  if (Object.keys(whatIf.ratingAdjustments).length > 0) {
-    params.set('what_if_adjustments', JSON.stringify(whatIf.ratingAdjustments));
+  if (Object.keys(allAdjustments).length > 0) {
+    params.set('what_if_adjustments', JSON.stringify(allAdjustments));
   }
   const str = params.toString();
   return str ? `?${str}` : '';

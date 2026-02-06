@@ -6,10 +6,19 @@ import type { WhatIfState } from '../types';
 
 // Helper to create a stable key from whatIf state
 function whatIfKey(whatIf: WhatIfState): string {
-  if (whatIf.gameOutcomes.length === 0 && Object.keys(whatIf.ratingAdjustments).length === 0) {
+  const allOutcomes = [
+    ...whatIf.permanentGameOutcomes,
+    ...whatIf.scenarioGameOutcomes,
+  ];
+  const allAdjustments = {
+    ...whatIf.permanentRatingAdjustments,
+    ...whatIf.scenarioRatingAdjustments,
+  };
+
+  if (allOutcomes.length === 0 && Object.keys(allAdjustments).length === 0) {
     return 'base';
   }
-  return JSON.stringify(whatIf);
+  return JSON.stringify({ outcomes: allOutcomes, adjustments: allAdjustments });
 }
 
 export function useTeams() {

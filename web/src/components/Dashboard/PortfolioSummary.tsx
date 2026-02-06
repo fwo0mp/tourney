@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { usePortfolioDistribution, usePortfolioValue, usePositions } from '../../hooks/usePortfolio';
 import { useUIStore } from '../../store/uiStore';
+import { ScenarioSelector } from '../WhatIf/ScenarioSelector';
 import type { PortfolioSummary as PortfolioSummaryType } from '../../types';
 
 const SIMULATION_OPTIONS = [
@@ -144,8 +145,26 @@ export function PortfolioSummary() {
   const monteCarloStale = useUIStore((state) => state.monteCarloStale);
   const clearMonteCarloStale = useUIStore((state) => state.clearMonteCarloStale);
   const whatIf = useUIStore((state) => state.whatIf);
+  const clearTemporaryOverrides = useUIStore((state) => state.clearTemporaryOverrides);
+  const loadScenarios = useUIStore((state) => state.loadScenarios);
+  const scenariosLoaded = useUIStore((state) => state.scenariosLoaded);
 
-  const hasWhatIfActive = whatIf.gameOutcomes.length > 0 || Object.keys(whatIf.ratingAdjustments).length > 0;
+  // Load scenarios on mount
+  useEffect(() => {
+    if (!scenariosLoaded) {
+      loadScenarios();
+    }
+  }, [scenariosLoaded, loadScenarios]);
+
+  const permanentOverrideCount =
+    whatIf.permanentGameOutcomes.length +
+    Object.keys(whatIf.permanentRatingAdjustments).length;
+
+  const scenarioOverrideCount =
+    whatIf.scenarioGameOutcomes.length +
+    Object.keys(whatIf.scenarioRatingAdjustments).length;
+
+  const hasAnyOverrides = permanentOverrideCount > 0 || scenarioOverrideCount > 0;
 
   // Use live EV from reactive hook, with distribution EV as fallback
   const displayEV = liveValue?.expected_value ?? distribution?.expected_value;
@@ -243,11 +262,24 @@ export function PortfolioSummary() {
               {distLoading ? 'Simulating...' : 'Re-simulate'}
             </button>
           )}
-          {hasWhatIfActive && (
-            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-              Scenario Active
+          {scenarioOverrideCount > 0 && (
+            <button
+              onClick={clearTemporaryOverrides}
+              className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 rounded"
+              title="Clear scenario overrides"
+            >
+              Clear Temp
+            </button>
+          )}
+          {permanentOverrideCount > 0 && (
+            <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded" title="Permanent overrides active">
+              {permanentOverrideCount} perm
             </span>
           )}
+          {/* Scenario Selector */}
+          {hasAnyOverrides || whatIf.activeScenarioId ? (
+            <ScenarioSelector compact />
+          ) : null}
           {positions?.is_mock && (
             <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
               Mock Data
