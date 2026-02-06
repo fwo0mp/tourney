@@ -98,6 +98,9 @@ def get_connection():
     conn.execute("PRAGMA foreign_keys = ON")
     try:
         yield conn
+    except BaseException:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
