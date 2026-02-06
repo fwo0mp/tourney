@@ -114,13 +114,13 @@ def get_bracket(
             """Determine region based on position."""
             if total == 64:
                 if idx < 16:
-                    return "South"
+                    return "south"
                 elif idx < 32:
-                    return "East"
+                    return "east"
                 elif idx < 48:
-                    return "Midwest"
+                    return "midwest"
                 else:
-                    return "West"
+                    return "west"
             return None
 
         games = []
