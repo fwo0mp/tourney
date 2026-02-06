@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { portfolioApi } from '../api/portfolio';
 import { useUIStore } from '../store/uiStore';
+import { whatIfKey } from './useTournament';
 
 export function usePositions() {
   return useQuery({
@@ -16,7 +17,7 @@ export function usePortfolioValue() {
   // This is a cheap probabilistic calculation, so it's safe to call frequently
   const whatIf = useUIStore((state) => state.whatIf);
   return useQuery({
-    queryKey: ['portfolio', 'value', whatIf],
+    queryKey: ['portfolio', 'value', whatIfKey(whatIf)],
     queryFn: () => portfolioApi.getValue(whatIf),
     staleTime: 30_000,
     refetchInterval: 60_000,
@@ -60,7 +61,7 @@ export function useHypotheticalPortfolio(positionChanges: Record<string, number>
   const hasNonZeroChanges = hasChanges && Object.values(positionChanges!).some((v) => v !== 0);
 
   return useQuery({
-    queryKey: ['portfolio', 'hypothetical', positionChanges, whatIf],
+    queryKey: ['portfolio', 'hypothetical', positionChanges, whatIfKey(whatIf)],
     queryFn: () => portfolioApi.getHypotheticalValue(positionChanges!, whatIf),
     enabled: hasNonZeroChanges,
     staleTime: 30_000,

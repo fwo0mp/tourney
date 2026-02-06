@@ -5,7 +5,7 @@ import { useUIStore } from '../store/uiStore';
 import type { WhatIfState } from '../types';
 
 // Helper to create a stable key from whatIf state
-function whatIfKey(whatIf: WhatIfState): string {
+export function whatIfKey(whatIf: WhatIfState): string {
   const allOutcomes = [
     ...whatIf.permanentGameOutcomes,
     ...whatIf.scenarioGameOutcomes,
