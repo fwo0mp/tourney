@@ -268,10 +268,12 @@ export const useUIStore = create<UIState>((set, get) => ({
 
     set((state) => {
       const key = isPermanent ? 'permanentRatingAdjustments' : 'scenarioRatingAdjustments';
-      const { [team]: _, ...rest } = state.whatIf[key];
+      const filtered = Object.fromEntries(
+        Object.entries(state.whatIf[key]).filter(([k]) => k !== team)
+      );
       return {
         monteCarloStale: true,
-        whatIf: { ...state.whatIf, [key]: rest },
+        whatIf: { ...state.whatIf, [key]: filtered },
       };
     });
 
@@ -360,11 +362,13 @@ export const useUIStore = create<UIState>((set, get) => ({
         const adjustment = state.whatIf.scenarioRatingAdjustments[team];
         if (adjustment === undefined) return state;
 
-        const { [team]: _, ...restScenario } = state.whatIf.scenarioRatingAdjustments;
+        const filteredScenario = Object.fromEntries(
+          Object.entries(state.whatIf.scenarioRatingAdjustments).filter(([k]) => k !== team)
+        );
         return {
           whatIf: {
             ...state.whatIf,
-            scenarioRatingAdjustments: restScenario,
+            scenarioRatingAdjustments: filteredScenario,
             permanentRatingAdjustments: {
               ...state.whatIf.permanentRatingAdjustments,
               [team]: adjustment,

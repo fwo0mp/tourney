@@ -134,7 +134,7 @@ export function getCandidatesForNode(
   node: BracketTreeNode
 ): Array<{ team: string; probability: number }> {
   return Object.entries(node.teams)
-    .filter(([_, prob]) => prob > 0.001) // Filter negligible probabilities
+    .filter(([, prob]) => prob > 0.001) // Filter negligible probabilities
     .map(([team, probability]) => ({ team, probability }))
     .sort((a, b) => b.probability - a.probability);
 }
