@@ -1,29 +1,5 @@
-import { api } from './client';
+import { api, encodeWhatIfParams } from './client';
 import type { TeamInfo, BracketResponse, BracketTreeResponse, WhatIfState, CompletedGame, ScoringConfig } from '../types';
-
-function encodeWhatIfParams(whatIf: WhatIfState | null): string {
-  if (!whatIf) return '';
-
-  // Combine permanent and scenario overrides
-  const allOutcomes = [
-    ...whatIf.permanentGameOutcomes,
-    ...whatIf.scenarioGameOutcomes,
-  ];
-  const allAdjustments = {
-    ...whatIf.permanentRatingAdjustments,
-    ...whatIf.scenarioRatingAdjustments,
-  };
-
-  const params = new URLSearchParams();
-  if (allOutcomes.length > 0) {
-    params.set('what_if_outcomes', JSON.stringify(allOutcomes));
-  }
-  if (Object.keys(allAdjustments).length > 0) {
-    params.set('what_if_adjustments', JSON.stringify(allAdjustments));
-  }
-  const str = params.toString();
-  return str ? `?${str}` : '';
-}
 
 export const tournamentApi = {
   getTeams: (whatIf: WhatIfState | null = null) =>

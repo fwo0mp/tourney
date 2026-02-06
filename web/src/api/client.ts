@@ -1,4 +1,34 @@
+import type { WhatIfState } from '../types';
+
 const API_BASE = '/api/v1';
+
+/**
+ * Encode what-if state as URL query parameters.
+ * Combines permanent and scenario overrides into what_if_outcomes and what_if_adjustments params.
+ * Returns a query string with '?' prefix, or empty string if no params.
+ */
+export function encodeWhatIfParams(whatIf: WhatIfState | null | undefined): string {
+  if (!whatIf) return '';
+  const params = new URLSearchParams();
+
+  const allOutcomes = [
+    ...whatIf.permanentGameOutcomes,
+    ...whatIf.scenarioGameOutcomes,
+  ];
+  const allAdjustments = {
+    ...whatIf.permanentRatingAdjustments,
+    ...whatIf.scenarioRatingAdjustments,
+  };
+
+  if (allOutcomes.length > 0) {
+    params.set('what_if_outcomes', JSON.stringify(allOutcomes));
+  }
+  if (Object.keys(allAdjustments).length > 0) {
+    params.set('what_if_adjustments', JSON.stringify(allAdjustments));
+  }
+  const str = params.toString();
+  return str ? `?${str}` : '';
+}
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${url}`, {

@@ -1,39 +1,16 @@
 """Tournament API endpoints."""
 
-import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.models import TeamInfo, BracketResponse, BracketGame, PlayInGame, CompletedGame, ScoringConfig, BracketTreeResponse
 from api.services.tournament_service import TournamentService, get_tournament_service, apply_what_if, build_bracket_tree_response
 from api.services.portfolio_service import PortfolioService, get_portfolio_service
+from api.utils import parse_what_if_params
 from api import database as db
 import portfolio_value as pv
 import tourney_utils as tourney
 
 router = APIRouter(prefix="/tournament", tags=["tournament"])
-
-
-def parse_what_if_params(
-    what_if_outcomes: str | None,
-    what_if_adjustments: str | None,
-) -> tuple[list, dict]:
-    """Parse what-if parameters from query strings."""
-    outcomes = []
-    adjustments = {}
-
-    if what_if_outcomes:
-        try:
-            outcomes = json.loads(what_if_outcomes)
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid JSON in what_if_outcomes parameter")
-
-    if what_if_adjustments:
-        try:
-            adjustments = json.loads(what_if_adjustments)
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid JSON in what_if_adjustments parameter")
-
-    return outcomes, adjustments
 
 
 @router.get("/teams", response_model=list[TeamInfo])

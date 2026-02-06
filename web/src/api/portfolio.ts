@@ -1,4 +1,4 @@
-import { api } from './client';
+import { api, encodeWhatIfParams } from './client';
 import type {
   PositionsResponse,
   PortfolioSummary,
@@ -8,40 +8,15 @@ import type {
   PortfolioValueResponse,
 } from '../types';
 
-function encodeWhatIfParams(whatIf?: WhatIfState): URLSearchParams {
-  const params = new URLSearchParams();
-  if (!whatIf) return params;
-
-  // Combine permanent and scenario overrides
-  const allOutcomes = [
-    ...whatIf.permanentGameOutcomes,
-    ...whatIf.scenarioGameOutcomes,
-  ];
-  const allAdjustments = {
-    ...whatIf.permanentRatingAdjustments,
-    ...whatIf.scenarioRatingAdjustments,
-  };
-
-  if (allOutcomes.length > 0) {
-    params.set('what_if_outcomes', JSON.stringify(allOutcomes));
-  }
-  if (Object.keys(allAdjustments).length > 0) {
-    params.set('what_if_adjustments', JSON.stringify(allAdjustments));
-  }
-  return params;
-}
-
 export const portfolioApi = {
   getPositions: () => api.get<PositionsResponse>('/portfolio/positions'),
-  getValue: (whatIf?: WhatIfState) => {
-    const params = encodeWhatIfParams(whatIf);
-    const queryString = params.toString();
-    return api.get<PortfolioValueResponse>(`/portfolio/value${queryString ? `?${queryString}` : ''}`);
-  },
+  getValue: (whatIf?: WhatIfState) =>
+    api.get<PortfolioValueResponse>(`/portfolio/value${encodeWhatIfParams(whatIf)}`),
   getDistribution: (nSimulations = 10000, whatIf?: WhatIfState) => {
-    const params = encodeWhatIfParams(whatIf);
-    params.set('n_simulations', String(nSimulations));
-    return api.get<PortfolioSummary>(`/portfolio/distribution?${params.toString()}`);
+    const whatIfQs = encodeWhatIfParams(whatIf);
+    const sep = whatIfQs ? '&' : '?';
+    const base = `/portfolio/distribution${whatIfQs}`;
+    return api.get<PortfolioSummary>(`${base}${sep}n_simulations=${nSimulations}`);
   },
   getDeltas: (pointDelta = 1.0) =>
     api.get<DeltasResponse>(`/portfolio/deltas?point_delta=${pointDelta}`),
@@ -57,12 +32,9 @@ export const portfolioApi = {
       }>;
     }>(`/portfolio/team/${encodeURIComponent(teamName)}/impact?point_delta=${pointDelta}`),
 
-  getHypotheticalValue: (positionChanges: Record<string, number>, whatIf?: WhatIfState) => {
-    const params = encodeWhatIfParams(whatIf);
-    const queryString = params.toString();
-    return api.post<HypotheticalValueResponse>(
-      `/portfolio/hypothetical-value${queryString ? `?${queryString}` : ''}`,
+  getHypotheticalValue: (positionChanges: Record<string, number>, whatIf?: WhatIfState) =>
+    api.post<HypotheticalValueResponse>(
+      `/portfolio/hypothetical-value${encodeWhatIfParams(whatIf)}`,
       { position_changes: positionChanges }
-    );
-  },
+    ),
 };

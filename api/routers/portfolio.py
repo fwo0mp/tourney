@@ -1,6 +1,5 @@
 """Portfolio API endpoints."""
 
-import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 import portfolio_value as pv
@@ -13,6 +12,7 @@ from api.models import (
 )
 from api.services.portfolio_service import PortfolioService, get_portfolio_service
 from api.services.tournament_service import TournamentService, get_tournament_service, apply_what_if
+from api.utils import parse_what_if_params
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
@@ -40,19 +40,7 @@ def get_value(
     Optionally apply what-if scenarios.
     """
     try:
-        # Parse what-if parameters
-        outcomes = []
-        adjustments = {}
-        if what_if_outcomes:
-            try:
-                outcomes = json.loads(what_if_outcomes)
-            except json.JSONDecodeError:
-                raise HTTPException(status_code=400, detail="Invalid JSON in what_if_outcomes parameter")
-        if what_if_adjustments:
-            try:
-                adjustments = json.loads(what_if_adjustments)
-            except json.JSONDecodeError:
-                raise HTTPException(status_code=400, detail="Invalid JSON in what_if_adjustments parameter")
+        outcomes, adjustments = parse_what_if_params(what_if_outcomes, what_if_adjustments)
 
         # Get tournament state, optionally with what-if modifications
         state = tournament.get_state()
@@ -88,19 +76,7 @@ def get_distribution(
     Optionally apply what-if scenarios before running simulations.
     """
     try:
-        # Parse what-if parameters
-        outcomes = []
-        adjustments = {}
-        if what_if_outcomes:
-            try:
-                outcomes = json.loads(what_if_outcomes)
-            except json.JSONDecodeError:
-                raise HTTPException(status_code=400, detail="Invalid JSON in what_if_outcomes parameter")
-        if what_if_adjustments:
-            try:
-                adjustments = json.loads(what_if_adjustments)
-            except json.JSONDecodeError:
-                raise HTTPException(status_code=400, detail="Invalid JSON in what_if_adjustments parameter")
+        outcomes, adjustments = parse_what_if_params(what_if_outcomes, what_if_adjustments)
 
         # Get tournament state, optionally with what-if modifications
         state = tournament.get_state()
@@ -181,19 +157,7 @@ def get_hypothetical_value(
     since it requires price info which is client-side only.
     """
     try:
-        # Parse what-if parameters
-        outcomes = []
-        adjustments = {}
-        if what_if_outcomes:
-            try:
-                outcomes = json.loads(what_if_outcomes)
-            except json.JSONDecodeError:
-                raise HTTPException(status_code=400, detail="Invalid JSON in what_if_outcomes parameter")
-        if what_if_adjustments:
-            try:
-                adjustments = json.loads(what_if_adjustments)
-            except json.JSONDecodeError:
-                raise HTTPException(status_code=400, detail="Invalid JSON in what_if_adjustments parameter")
+        outcomes, adjustments = parse_what_if_params(what_if_outcomes, what_if_adjustments)
 
         # Get tournament state with any what-if modifications
         state = tournament.get_state()

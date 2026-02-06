@@ -1,6 +1,5 @@
 """Analysis API endpoints for game impact and what-if scenarios."""
 
-import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.models import (
@@ -33,33 +32,11 @@ from api.services.portfolio_service import (
     get_portfolio_service,
     get_slot_candidates_with_deltas,
 )
+from api.utils import parse_what_if_params
 from api import database as db
 import portfolio_value as pv
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
-
-
-def parse_what_if_params(
-    what_if_outcomes: str | None,
-    what_if_adjustments: str | None,
-) -> tuple[list, dict]:
-    """Parse what-if parameters from query strings."""
-    outcomes = []
-    adjustments = {}
-
-    if what_if_outcomes:
-        try:
-            outcomes = json.loads(what_if_outcomes)
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid JSON in what_if_outcomes parameter")
-
-    if what_if_adjustments:
-        try:
-            adjustments = json.loads(what_if_adjustments)
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid JSON in what_if_adjustments parameter")
-
-    return outcomes, adjustments
 
 
 @router.get("/games/upcoming", response_model=list[GameImpact])

@@ -1,4 +1,4 @@
-import { api } from './client';
+import { api, encodeWhatIfParams } from './client';
 import type {
   GameImpact,
   GameDeltaResponse,
@@ -10,30 +10,6 @@ import type {
   WhatIfState,
   Scenario,
 } from '../types';
-
-function encodeWhatIfParams(whatIf: WhatIfState | null): string {
-  if (!whatIf) return '';
-  const params = new URLSearchParams();
-
-  // Combine permanent and scenario outcomes for query params
-  const allOutcomes = [
-    ...whatIf.permanentGameOutcomes,
-    ...whatIf.scenarioGameOutcomes,
-  ];
-  const allAdjustments = {
-    ...whatIf.permanentRatingAdjustments,
-    ...whatIf.scenarioRatingAdjustments,
-  };
-
-  if (allOutcomes.length > 0) {
-    params.set('what_if_outcomes', JSON.stringify(allOutcomes));
-  }
-  if (Object.keys(allAdjustments).length > 0) {
-    params.set('what_if_adjustments', JSON.stringify(allAdjustments));
-  }
-  const str = params.toString();
-  return str ? `?${str}` : '';
-}
 
 export const analysisApi = {
   getUpcomingGames: (topN = 10) =>
