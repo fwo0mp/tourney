@@ -71,6 +71,17 @@ const emptyWhatIfState: WhatIfState = {
   activeScenarioName: null,
 };
 
+// Re-fetch authoritative what-if state from the server.
+// Used as error recovery instead of rolling back to a potentially stale snapshot.
+async function refetchWhatIfState(set: (partial: Partial<UIState>) => void) {
+  try {
+    const state = await analysisApi.getWhatIfState();
+    set({ whatIf: state });
+  } catch (refetchError) {
+    console.error('Failed to re-fetch what-if state after error:', refetchError);
+  }
+}
+
 export const useUIStore = create<UIState>((set, get) => ({
   selectedTeam: null,
   selectedGame: null,
@@ -170,9 +181,6 @@ export const useUIStore = create<UIState>((set, get) => ({
       ? [team1, team2, probability]
       : [team2, team1, 1.0 - probability];
 
-    // Capture pre-update state for rollback
-    const prevWhatIf = get().whatIf;
-
     // Optimistic update
     set((state) => {
       const key = isPermanent ? 'permanentGameOutcomes' : 'scenarioGameOutcomes';
@@ -190,18 +198,16 @@ export const useUIStore = create<UIState>((set, get) => ({
       };
     });
 
-    // Persist to backend, rollback on failure
+    // Persist to backend, re-fetch server state on failure
     analysisApi.setWhatIfGameOutcome(t1, t2, prob, isPermanent).catch((e) => {
-      console.error('Failed to persist game outcome, rolling back:', e);
-      set({ whatIf: prevWhatIf });
+      console.error('Failed to persist game outcome, re-fetching state:', e);
+      refetchWhatIfState(set);
     });
   },
 
   removeGameOutcome: (team1, team2, isPermanent) => {
     // Normalize to lexicographic order
     const [t1, t2] = team1 < team2 ? [team1, team2] : [team2, team1];
-
-    const prevWhatIf = get().whatIf;
 
     set((state) => {
       const key = isPermanent ? 'permanentGameOutcomes' : 'scenarioGameOutcomes';
@@ -217,8 +223,8 @@ export const useUIStore = create<UIState>((set, get) => ({
     });
 
     analysisApi.removeWhatIfGameOutcome(t1, t2, isPermanent).catch((e) => {
-      console.error('Failed to remove game outcome, rolling back:', e);
-      set({ whatIf: prevWhatIf });
+      console.error('Failed to remove game outcome, re-fetching state:', e);
+      refetchWhatIfState(set);
     });
   },
 
@@ -241,7 +247,7 @@ export const useUIStore = create<UIState>((set, get) => ({
       (o) => !newKeys.has(`${o.team1}|${o.team2}`)
     );
 
-    // Persist additions/updates and removals, rollback on failure
+    // Persist additions/updates and removals, re-fetch on failure
     Promise.all([
       ...outcomes.map((o) =>
         analysisApi.setWhatIfGameOutcome(o.team1, o.team2, o.probability, isPermanent)
@@ -250,14 +256,12 @@ export const useUIStore = create<UIState>((set, get) => ({
         analysisApi.removeWhatIfGameOutcome(o.team1, o.team2, isPermanent)
       ),
     ]).catch((e) => {
-      console.error('Failed to persist game outcomes, rolling back:', e);
-      set({ whatIf: prevWhatIf });
+      console.error('Failed to persist game outcomes, re-fetching state:', e);
+      refetchWhatIfState(set);
     });
   },
 
   setRatingAdjustment: (team, delta, isPermanent = false) => {
-    const prevWhatIf = get().whatIf;
-
     set((state) => {
       const key = isPermanent ? 'permanentRatingAdjustments' : 'scenarioRatingAdjustments';
       return {
@@ -270,14 +274,12 @@ export const useUIStore = create<UIState>((set, get) => ({
     });
 
     analysisApi.setWhatIfRatingAdjustment(team, delta, isPermanent).catch((e) => {
-      console.error('Failed to persist rating adjustment, rolling back:', e);
-      set({ whatIf: prevWhatIf });
+      console.error('Failed to persist rating adjustment, re-fetching state:', e);
+      refetchWhatIfState(set);
     });
   },
 
   removeRatingAdjustment: (team, isPermanent) => {
-    const prevWhatIf = get().whatIf;
-
     set((state) => {
       const key = isPermanent ? 'permanentRatingAdjustments' : 'scenarioRatingAdjustments';
       const filtered = Object.fromEntries(
@@ -290,14 +292,12 @@ export const useUIStore = create<UIState>((set, get) => ({
     });
 
     analysisApi.removeWhatIfRatingAdjustment(team, isPermanent).catch((e) => {
-      console.error('Failed to remove rating adjustment, rolling back:', e);
-      set({ whatIf: prevWhatIf });
+      console.error('Failed to remove rating adjustment, re-fetching state:', e);
+      refetchWhatIfState(set);
     });
   },
 
   clearTemporaryOverrides: () => {
-    const prevWhatIf = get().whatIf;
-
     set((state) => ({
       monteCarloStale: true,
       whatIf: {
@@ -308,14 +308,12 @@ export const useUIStore = create<UIState>((set, get) => ({
     }));
 
     analysisApi.clearTemporaryOverrides().catch((e) => {
-      console.error('Failed to clear temporary overrides, rolling back:', e);
-      set({ whatIf: prevWhatIf });
+      console.error('Failed to clear temporary overrides, re-fetching state:', e);
+      refetchWhatIfState(set);
     });
   },
 
   clearWhatIf: () => {
-    const prevWhatIf = get().whatIf;
-
     set((state) => ({
       monteCarloStale: false,
       whatIf: {
@@ -328,8 +326,8 @@ export const useUIStore = create<UIState>((set, get) => ({
     }));
 
     analysisApi.clearWhatIfState().catch((e) => {
-      console.error('Failed to clear what-if state, rolling back:', e);
-      set({ whatIf: prevWhatIf });
+      console.error('Failed to clear what-if state, re-fetching state:', e);
+      refetchWhatIfState(set);
     });
   },
 
