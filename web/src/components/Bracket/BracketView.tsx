@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import * as d3 from 'd3';
-import { useTeams, useBracket } from '../../hooks/useTournament';
+import { useTeams, useBracket, useGameImportance } from '../../hooks/useTournament';
 import { useUIStore } from '../../store/uiStore';
 import { MetaTeamModal } from './MetaTeamModal';
 import { makePositionKey } from '../../utils/bracketTree';
@@ -51,6 +51,17 @@ function getDeltaColor(delta: number, maxDelta: number): string {
     const b = Math.round(neutral - intensity * 189); // 229 -> 40
     return `rgb(${r}, ${g}, ${b})`;
   }
+}
+
+function getImportanceColor(importance: number, maxImportance: number): string {
+  if (importance === 0 || maxImportance === 0) return '#d1d5db'; // gray-300
+  const t = Math.min(importance / maxImportance, 1);
+  // grey (#d1d5db = 209,213,219) -> deep blue (#1e40af = 30,64,175)
+  return `rgb(${Math.round(209 - t * 179)}, ${Math.round(213 - t * 149)}, ${Math.round(219 - t * 44)})`;
+}
+
+function makeGameKey(t1: string, t2: string): string {
+  return t1 < t2 ? `${t1}|${t2}` : `${t2}|${t1}`;
 }
 
 // Helper to get winner from an outcome (works with both formats)
@@ -149,6 +160,8 @@ function RegionBracket({
   maxDelta,
   flipHorizontal = false,
   compact = false,
+  gameImportanceMap,
+  maxImportance = 0,
 }: {
   games: BracketGame[];
   playInGames?: PlayInGame[];
@@ -158,6 +171,8 @@ function RegionBracket({
   maxDelta: number;
   flipHorizontal?: boolean;
   compact?: boolean;  // Use smaller dimensions for overall view
+  gameImportanceMap?: Map<string, number>;
+  maxImportance?: number;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const selectTeam = useUIStore((state) => state.selectTeam);
@@ -344,13 +359,17 @@ function RegionBracket({
            (selectedGame.team1 === bottomSlot.teamName && selectedGame.team2 === topSlot.teamName));
 
         // Round 0 teams aren't from "completed games" in the advancement sense
+        const r0GameKey = makeGameKey(topSlot.teamName, bottomSlot.teamName);
+        const r0Importance = gameImportanceMap?.get(r0GameKey) ?? 0;
+        const r0DefaultFill = maxImportance ? getImportanceColor(r0Importance, maxImportance) : 'rgba(219, 234, 254, 0.6)';
+
         gameBoxGroup.append('rect')
           .attr('x', boxX)
           .attr('y', boxY)
           .attr('width', boxWidth)
           .attr('height', boxHeight)
           .attr('rx', 5)
-          .attr('fill', isSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(219, 234, 254, 0.6)')
+          .attr('fill', isSelected ? 'rgba(59, 130, 246, 0.15)' : r0DefaultFill)
           .attr('stroke', isSelected ? '#3b82f6' : '#93c5fd')
           .attr('stroke-width', isSelected ? 2 : 1)
           .attr('cursor', isGameCompleted(topSlot.teamName, bottomSlot.teamName) ? 'default' : 'pointer')
@@ -372,7 +391,7 @@ function RegionBracket({
               ((selectedGame.team1 === topSlot.teamName && selectedGame.team2 === bottomSlot.teamName) ||
                (selectedGame.team1 === bottomSlot.teamName && selectedGame.team2 === topSlot.teamName));
             d3.select(this)
-              .attr('fill', stillSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(219, 234, 254, 0.6)')
+              .attr('fill', stillSelected ? 'rgba(59, 130, 246, 0.15)' : r0DefaultFill)
               .attr('stroke', stillSelected ? '#3b82f6' : '#93c5fd');
           });
       }
@@ -404,14 +423,18 @@ function RegionBracket({
 
           const gameCompleted = isGameCompleted(topSlot.teamName, bottomSlot.teamName);
 
+          const laterGameKey = makeGameKey(topSlot.teamName, bottomSlot.teamName);
+          const laterImportance = gameImportanceMap?.get(laterGameKey) ?? 0;
+          const laterDefaultFill = maxImportance ? getImportanceColor(laterImportance, maxImportance) : 'rgba(219, 234, 254, 0.6)';
+
           gameBoxGroup.append('rect')
             .attr('x', boxX)
             .attr('y', boxY)
             .attr('width', boxWidth)
             .attr('height', boxHeight)
             .attr('rx', 5)
-            .attr('fill', isSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(219, 234, 254, 0.6)')  // blue-100 with opacity
-            .attr('stroke', isSelected ? '#3b82f6' : '#93c5fd')  // blue-500 or blue-300
+            .attr('fill', isSelected ? 'rgba(59, 130, 246, 0.15)' : laterDefaultFill)
+            .attr('stroke', isSelected ? '#3b82f6' : '#93c5fd')
             .attr('stroke-width', isSelected ? 2 : 1)
             .attr('cursor', gameCompleted ? 'default' : 'pointer')
             .on('click', (event: MouseEvent) => {
@@ -436,7 +459,7 @@ function RegionBracket({
                 ((selectedGame.team1 === topSlot.teamName && selectedGame.team2 === bottomSlot.teamName) ||
                  (selectedGame.team1 === bottomSlot.teamName && selectedGame.team2 === topSlot.teamName));
               d3.select(this)
-                .attr('fill', stillSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(219, 234, 254, 0.6)')
+                .attr('fill', stillSelected ? 'rgba(59, 130, 246, 0.15)' : laterDefaultFill)
                 .attr('stroke', stillSelected ? '#3b82f6' : '#93c5fd');
             });
         }
@@ -585,13 +608,17 @@ function RegionBracket({
            (selectedGame.team1 === playIn.team2 && selectedGame.team2 === playIn.team1));
         const playInCompleted = isGameCompleted(playIn.team1, playIn.team2);
 
+        const piGameKey = makeGameKey(playIn.team1, playIn.team2);
+        const piImportance = gameImportanceMap?.get(piGameKey) ?? 0;
+        const piDefaultFill = maxImportance ? getImportanceColor(piImportance, maxImportance) : 'rgba(219, 234, 254, 0.6)';
+
         playInGroup.append('rect')
           .attr('x', playInX - gameBoxPadding)
           .attr('y', boxTop)
           .attr('width', slotWidth + gameBoxPadding * 2)
           .attr('height', boxBottom - boxTop)
           .attr('rx', 5)
-          .attr('fill', playInSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(219, 234, 254, 0.6)')
+          .attr('fill', playInSelected ? 'rgba(59, 130, 246, 0.15)' : piDefaultFill)
           .attr('stroke', playInSelected ? '#3b82f6' : '#93c5fd')
           .attr('stroke-width', playInSelected ? 2 : 1)
           .attr('cursor', playInCompleted ? 'default' : 'pointer')
@@ -613,7 +640,7 @@ function RegionBracket({
               ((selectedGame.team1 === playIn.team1 && selectedGame.team2 === playIn.team2) ||
                (selectedGame.team1 === playIn.team2 && selectedGame.team2 === playIn.team1));
             d3.select(this)
-              .attr('fill', stillSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(219, 234, 254, 0.6)')
+              .attr('fill', stillSelected ? 'rgba(59, 130, 246, 0.15)' : piDefaultFill)
               .attr('stroke', stillSelected ? '#3b82f6' : '#93c5fd');
           });
 
@@ -939,7 +966,7 @@ function RegionBracket({
       }
     });
 
-  }, [games, playInGames, completedGames, teamInfoMap, maxDelta, flipHorizontal, compact, selectTeam, selectGame, selectedTeam, selectedGame, regionIndex, openMetaTeamModal, whatIf]);
+  }, [games, playInGames, completedGames, teamInfoMap, maxDelta, flipHorizontal, compact, selectTeam, selectGame, selectedTeam, selectedGame, regionIndex, openMetaTeamModal, whatIf, gameImportanceMap, maxImportance]);
 
   const slotWidth = compact ? COMPACT_SLOT_WIDTH : SLOT_WIDTH;
   const roundGap = compact ? COMPACT_ROUND_GAP : ROUND_GAP;
@@ -1264,6 +1291,7 @@ export function BracketView() {
   const [view, setView] = useState<BracketViewType>('overall');
   const { data: teams, isLoading: teamsLoading } = useTeams();
   const { data: bracket, isLoading: bracketLoading } = useBracket();
+  const { data: importanceData } = useGameImportance();
   const containerRef = useRef<HTMLDivElement>(null);
   const selectedTeam = useUIStore((state) => state.selectedTeam);
   const selectedGame = useUIStore((state) => state.selectedGame);
@@ -1309,6 +1337,19 @@ export function BracketView() {
 
   // Calculate max delta for color scaling
   const maxDelta = Math.max(...teams.map((t) => Math.abs(t.delta)));
+
+  // Build game importance map
+  const gameImportanceMap = new Map<string, number>();
+  let maxImportance = 0;
+  if (importanceData?.games) {
+    for (const g of importanceData.games) {
+      const key = makeGameKey(g.team1, g.team2);
+      gameImportanceMap.set(key, g.adjusted_importance);
+      if (g.adjusted_importance > maxImportance) {
+        maxImportance = g.adjusted_importance;
+      }
+    }
+  }
 
   // Split bracket games into regions (16 games each for 64-team bracket)
   // Also split play-in games by region based on their slot_index
@@ -1362,6 +1403,8 @@ export function BracketView() {
             teamInfoMap={teamInfoMap}
             regionIndex={0}
             maxDelta={maxDelta}
+            gameImportanceMap={gameImportanceMap}
+            maxImportance={maxImportance}
           />
         );
       case 'region2':
@@ -1373,6 +1416,8 @@ export function BracketView() {
             teamInfoMap={teamInfoMap}
             regionIndex={1}
             maxDelta={maxDelta}
+            gameImportanceMap={gameImportanceMap}
+            maxImportance={maxImportance}
           />
         );
       case 'region3':
@@ -1384,6 +1429,8 @@ export function BracketView() {
             teamInfoMap={teamInfoMap}
             regionIndex={2}
             maxDelta={maxDelta}
+            gameImportanceMap={gameImportanceMap}
+            maxImportance={maxImportance}
           />
         );
       case 'region4':
@@ -1395,6 +1442,8 @@ export function BracketView() {
             teamInfoMap={teamInfoMap}
             regionIndex={3}
             maxDelta={maxDelta}
+            gameImportanceMap={gameImportanceMap}
+            maxImportance={maxImportance}
           />
         );
       case 'sweet16':
@@ -1418,6 +1467,8 @@ export function BracketView() {
                 teamInfoMap={teamInfoMap}
                 regionIndex={0}
                 maxDelta={maxDelta}
+                gameImportanceMap={gameImportanceMap}
+                maxImportance={maxImportance}
                 compact
               />
               <RegionBracket
@@ -1427,6 +1478,8 @@ export function BracketView() {
                 teamInfoMap={teamInfoMap}
                 regionIndex={1}
                 maxDelta={maxDelta}
+                gameImportanceMap={gameImportanceMap}
+                maxImportance={maxImportance}
                 compact
               />
             </div>
@@ -1438,6 +1491,8 @@ export function BracketView() {
                 teamInfoMap={teamInfoMap}
                 regionIndex={2}
                 maxDelta={maxDelta}
+                gameImportanceMap={gameImportanceMap}
+                maxImportance={maxImportance}
                 flipHorizontal
                 compact
               />
@@ -1448,6 +1503,8 @@ export function BracketView() {
                 teamInfoMap={teamInfoMap}
                 regionIndex={3}
                 maxDelta={maxDelta}
+                gameImportanceMap={gameImportanceMap}
+                maxImportance={maxImportance}
                 flipHorizontal
                 compact
               />
@@ -1484,18 +1541,36 @@ export function BracketView() {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-4 text-xs">
-          <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: getDeltaColor(maxDelta, maxDelta) }}></div>
-            <span>+Delta</span>
+        <div className="flex items-center gap-6 text-xs">
+          <div className="flex items-center gap-3">
+            <span className="font-medium text-gray-600">Team:</span>
+            <div className="flex items-center gap-1">
+              <div className="w-4 h-4 rounded" style={{ backgroundColor: getDeltaColor(maxDelta, maxDelta) }}></div>
+              <span>+Delta</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-4 h-4 rounded bg-gray-200"></div>
+              <span>Neutral</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-4 h-4 rounded" style={{ backgroundColor: getDeltaColor(-maxDelta, maxDelta) }}></div>
+              <span>-Delta</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded bg-gray-200"></div>
-            <span>Neutral</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: getDeltaColor(-maxDelta, maxDelta) }}></div>
-            <span>-Delta</span>
+          <div className="flex items-center gap-3">
+            <span className="font-medium text-gray-600">Game:</span>
+            <div className="flex items-center gap-1">
+              <div className="w-4 h-4 rounded" style={{ backgroundColor: '#d1d5db' }}></div>
+              <span>Low</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-4 h-4 rounded" style={{ backgroundColor: getImportanceColor(0.5, 1) }}></div>
+              <span>Med</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-4 h-4 rounded" style={{ backgroundColor: '#1e40af' }}></div>
+              <span>High</span>
+            </div>
           </div>
         </div>
       </div>

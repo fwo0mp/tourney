@@ -34,4 +34,5 @@ module-name = "tourney_core"
 dev = [
     "maturin>=1.11.5",
     "pytest>=9.0.2",
+    "selenium>=4.40.0",
 ]

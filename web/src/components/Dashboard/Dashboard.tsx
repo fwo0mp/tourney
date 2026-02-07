@@ -1,5 +1,6 @@
 import { PortfolioSummary } from './PortfolioSummary';
 import { TeamsTable } from './TeamsTable';
+import { GameImportanceTable } from './GameImportanceTable';
 import { BracketView } from '../Bracket/BracketView';
 import { WhatIfTool } from '../WhatIf';
 import { CompletedGamesView } from '../CompletedGames';
@@ -69,7 +70,12 @@ export function Dashboard() {
         </button>
       </div>
 
-      {viewMode === 'overview' && <TeamsTable />}
+      {viewMode === 'overview' && (
+        <div className="space-y-6">
+          <TeamsTable />
+          <GameImportanceTable />
+        </div>
+      )}
 
       {viewMode === 'bracket' && <BracketView />}
 

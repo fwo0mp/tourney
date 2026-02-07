@@ -61,6 +61,15 @@ export function useBracketTree() {
   });
 }
 
+export function useGameImportance() {
+  const whatIf = useUIStore((state) => state.whatIf);
+  return useQuery({
+    queryKey: ['analysis', 'game-importance', whatIfKey(whatIf)],
+    queryFn: () => analysisApi.getGameImportance(whatIf),
+    staleTime: 60_000,
+  });
+}
+
 export function useGameImpact(team1: string | null, team2: string | null) {
   return useQuery({
     queryKey: ['analysis', 'game', team1, team2],

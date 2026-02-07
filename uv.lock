@@ -816,6 +816,7 @@ dev = [
 dev = [
     { name = "maturin" },
     { name = "pytest" },
+    { name = "selenium" },
 ]
 
 [package.metadata]
@@ -837,6 +838,7 @@ provides-extras = ["dev"]
 dev = [
     { name = "maturin", specifier = ">=1.11.5" },
     { name = "pytest", specifier = ">=9.0.2" },
+    { name = "selenium", specifier = ">=4.40.0" },
 ]
 
 [[package]]

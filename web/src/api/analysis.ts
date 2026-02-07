@@ -2,6 +2,7 @@ import { api, encodeWhatIfParams } from './client';
 import type {
   GameImpact,
   GameDeltaResponse,
+  GameImportanceResponse,
   WhatIfRequest,
   WhatIfResponse,
   SlotCandidatesResponse,
@@ -16,6 +17,8 @@ export const analysisApi = {
     api.get<GameImpact[]>(`/analysis/games/upcoming?top_n=${topN}`),
   getGameImpact: (team1: string, team2: string) =>
     api.get<GameDeltaResponse>(`/analysis/game/${encodeURIComponent(team1)}/${encodeURIComponent(team2)}`),
+  getGameImportance: (whatIf: WhatIfState | null = null) =>
+    api.get<GameImportanceResponse>(`/analysis/game-importance${encodeWhatIfParams(whatIf)}`),
   analyzeWhatIf: (request: WhatIfRequest) =>
     api.post<WhatIfResponse>('/analysis/what-if', request),
   getSlotCandidates: (round: number, position: number, whatIf: WhatIfState | null = null) =>

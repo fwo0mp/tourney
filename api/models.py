@@ -73,6 +73,28 @@ class GameDeltaResponse(BaseModel):
     if_team2_wins: float
     swing: float
     team_impacts: list[TeamDeltaInfo]
+    raw_importance: float | None = None
+    adjusted_importance: float | None = None
+
+
+class GameImportance(BaseModel):
+    """Importance of an upcoming game to portfolio value."""
+
+    team1: str
+    team2: str
+    round: int
+    win_prob: float
+    if_team1_wins: float
+    if_team2_wins: float
+    raw_importance: float
+    adjusted_importance: float
+
+
+class GameImportanceResponse(BaseModel):
+    """Response for game importance analysis."""
+
+    games: list[GameImportance]
+    current_ev: float
 
 
 class WhatIfGameOutcome(BaseModel):

@@ -239,6 +239,118 @@ class PortfolioService:
             ],
         }
 
+    def get_all_game_importance(self, state=None) -> dict:
+        """Get importance scores for all upcoming determined games.
+
+        A game is "determined" when both teams in the matchup have probability >= 0.9999
+        of reaching that slot, but the game outcome itself is not yet decided.
+        """
+        import tourney_utils as tourney
+        from api.services.tournament_service import compute_bracket_rounds
+
+        positions, _ = self.get_positions()
+        if state is None:
+            tournament = get_tournament_service()
+            state = tournament.get_state()
+
+        # Get current EV
+        current_scores = state.calculate_scores_prob()
+        current_ev = pv.get_portfolio_value(positions, current_scores)
+
+        rounds = compute_bracket_rounds(state)
+        num_rounds = len(rounds)
+
+        # Find determined but unresolved games
+        games_to_evaluate = []
+        for r in range(num_rounds - 1):
+            round_slots = rounds[r]
+            next_round_slots = rounds[r + 1]
+            for j in range(0, len(round_slots), 2):
+                if j + 1 >= len(round_slots):
+                    break
+                slot_a = round_slots[j]
+                slot_b = round_slots[j + 1]
+
+                # Check both slots have a single determined team (prob >= 0.9999)
+                team1, team2 = None, None
+                for t, p in slot_a.items():
+                    if p >= 0.9999:
+                        team1 = t
+                        break
+                for t, p in slot_b.items():
+                    if p >= 0.9999:
+                        team2 = t
+                        break
+
+                if not team1 or not team2:
+                    continue
+
+                # Check if next round slot is already determined (game already decided)
+                next_slot_idx = j // 2
+                if next_slot_idx < len(next_round_slots):
+                    next_slot = next_round_slots[next_slot_idx]
+                    already_decided = any(p >= 0.9999 for p in next_slot.values())
+                    if already_decided:
+                        continue
+
+                games_to_evaluate.append((team1, team2, r))
+
+        # Also check championship game (last round has 1 slot)
+        # The championship is rounds[-1] with 1 slot, fed by rounds[-2] with 2 slots
+        # Already handled above since we iterate r from 0 to num_rounds-2
+
+        if not games_to_evaluate:
+            return {"games": [], "current_ev": current_ev}
+
+        # Build batch scenarios: for each game, two scenarios (team1 wins, team2 wins)
+        scenarios = []
+        for team1, team2, r in games_to_evaluate:
+            scenarios.append([(team1, team2, 1.0)])  # team1 wins
+            scenarios.append([(team1, team2, 0.0)])  # team2 wins
+
+        # Compute all in parallel
+        batch_results = state.calculate_scores_prob_batch(scenarios)
+
+        # Process results
+        games = []
+        for i, (team1, team2, r) in enumerate(games_to_evaluate):
+            scores_t1_wins = batch_results[i * 2]
+            scores_t2_wins = batch_results[i * 2 + 1]
+
+            ev_t1_wins = pv.get_portfolio_value(positions, scores_t1_wins)
+            ev_t2_wins = pv.get_portfolio_value(positions, scores_t2_wins)
+
+            delta_t1 = ev_t1_wins - current_ev
+            delta_t2 = ev_t2_wins - current_ev
+
+            raw_importance = abs(delta_t1 - delta_t2)
+
+            # Get win probability
+            t1_rating = state.ratings.get(team1)
+            t2_rating = state.ratings.get(team2)
+            if t1_rating and t2_rating:
+                win_prob = tourney.calculate_win_prob(
+                    t1_rating, t2_rating, state.overrides, state.forfeit_prob
+                )
+            else:
+                win_prob = 0.5
+
+            # Adjusted importance: weight by probability squared
+            adjusted_importance = abs(delta_t1) * win_prob**2 + abs(delta_t2) * (1 - win_prob)**2
+
+            games.append({
+                "team1": team1,
+                "team2": team2,
+                "round": r,
+                "win_prob": win_prob,
+                "if_team1_wins": delta_t1,
+                "if_team2_wins": delta_t2,
+                "raw_importance": raw_importance,
+                "adjusted_importance": adjusted_importance,
+            })
+
+        return {"games": games, "current_ev": current_ev}
+
     def get_upcoming_games_impact(self, top_n: int = 10) -> list[dict]:
         """Get games with biggest portfolio impact."""
         positions, _ = self.get_positions()

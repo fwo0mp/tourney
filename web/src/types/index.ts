@@ -56,6 +56,24 @@ export interface GameDeltaResponse {
   if_team2_wins: number;
   swing: number;
   team_impacts: TeamDeltaInfo[];
+  raw_importance?: number;
+  adjusted_importance?: number;
+}
+
+export interface GameImportance {
+  team1: string;
+  team2: string;
+  round: number;
+  win_prob: number;
+  if_team1_wins: number;
+  if_team2_wins: number;
+  raw_importance: number;
+  adjusted_importance: number;
+}
+
+export interface GameImportanceResponse {
+  games: GameImportance[];
+  current_ev: number;
 }
 
 export interface BracketGame {

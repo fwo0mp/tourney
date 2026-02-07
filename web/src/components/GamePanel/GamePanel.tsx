@@ -175,6 +175,27 @@ export function GamePanel({ team1, team2 }: GamePanelProps) {
               </div>
             </div>
 
+            {/* Game Importance */}
+            {impact.raw_importance !== undefined && (
+              <div className="border-t border-gray-200 pt-4">
+                <h3 className="text-sm font-medium text-gray-900 mb-3">Game Importance</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-blue-50 rounded-lg p-3 text-center">
+                    <div className="text-xl font-bold text-blue-600">
+                      {impact.raw_importance!.toFixed(2)}
+                    </div>
+                    <div className="text-xs text-gray-500">Raw Importance</div>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-3 text-center">
+                    <div className="text-xl font-bold text-blue-600">
+                      {impact.adjusted_importance!.toFixed(2)}
+                    </div>
+                    <div className="text-xs text-gray-500">Adjusted Importance</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Impact Breakdown by Holding */}
             {sortedImpacts.length > 0 && (
               <div className="border-t border-gray-200 pt-4">

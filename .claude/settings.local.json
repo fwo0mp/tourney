@@ -21,7 +21,9 @@
       "Bash(git stash:*)",
       "Bash(git stash pop:*)",
       "Bash(npx eslint:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(npx vite build:*)",
+      "Bash(uv add:*)"
     ]
   }
 }

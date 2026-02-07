@@ -5,6 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from api.models import (
     GameImpact,
     GameDeltaResponse,
+    GameImportance,
+    GameImportanceResponse,
     TeamDeltaInfo,
     WhatIfRequest,
     WhatIfResponse,
@@ -62,6 +64,31 @@ def get_upcoming_games(
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@router.get("/game-importance", response_model=GameImportanceResponse)
+def get_game_importance(
+    what_if_outcomes: str = Query(default=None, description="JSON-encoded game outcomes"),
+    what_if_adjustments: str = Query(default=None, description="JSON-encoded rating adjustments"),
+    tournament: TournamentService = Depends(get_tournament_service),
+    portfolio: PortfolioService = Depends(get_portfolio_service),
+):
+    """Get importance scores for all upcoming determined games."""
+    try:
+        outcomes, adjustments = parse_what_if_params(what_if_outcomes, what_if_adjustments)
+        state = tournament.get_state()
+        if outcomes or adjustments:
+            state = apply_what_if(state, outcomes, adjustments)
+
+        result = portfolio.get_all_game_importance(state=state)
+        return GameImportanceResponse(
+            games=[GameImportance(**g) for g in result["games"]],
+            current_ev=result["current_ev"],
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/game/{team1}/{team2}", response_model=GameDeltaResponse)
 def get_game_impact(
     team1: str,
@@ -71,6 +98,14 @@ def get_game_impact(
     """Get portfolio impact for a specific game outcome."""
     try:
         result = portfolio.get_game_delta(team1, team2)
+
+        # Compute importance scores inline
+        win_prob = result["win_prob"]
+        delta_t1 = result["if_team1_wins"]
+        delta_t2 = result["if_team2_wins"]
+        raw_importance = result["swing"]  # already abs(delta_t1 - delta_t2)
+        adjusted_importance = abs(delta_t1) * win_prob**2 + abs(delta_t2) * (1 - win_prob)**2
+
         return GameDeltaResponse(
             team1=result["team1"],
             team2=result["team2"],
@@ -81,6 +116,8 @@ def get_game_impact(
             team_impacts=[
                 TeamDeltaInfo(**ti) for ti in result["team_impacts"]
             ],
+            raw_importance=raw_importance,
+            adjusted_importance=adjusted_importance,
         )
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
