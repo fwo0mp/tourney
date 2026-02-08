@@ -27,6 +27,8 @@ ODDS_API_URL = "https://api.the-odds-api.com/v4/sports/basketball_ncaab/odds?api
 )
 CHROME_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
 
+# Scraping-specific name fixes for ESPN bracket data.
+# For cross-source name resolution (CIX, KenPom, odds API), see team_names.py.
 NAME_CONVERSIONS = {
     "Miami": "Miami FL",
     "Southern Cal": "USC",

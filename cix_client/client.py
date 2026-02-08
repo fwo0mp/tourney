@@ -3,7 +3,7 @@ from collections import namedtuple
 
 import requests
 
-from cix_client.exceptions import ApiException
+from cix_client.exceptions import ApiException, BracketMismatchError
 
 Portfolio = namedtuple("Portfolio", ["cash"])
 
@@ -21,6 +21,68 @@ class CixClient:
             base_url or os.getenv("CIX_BASE_URL", "http://localhost:8000")
         ).rstrip("/")
         self._session = requests.Session()
+        self._bracket_teams = None
+        self._bracket_validated = False
+        self._validation_error = None
+
+    def set_bracket_teams(self, teams):
+        """Set bracket team names for validation against CIX game config.
+
+        When set, the first API call will fetch game_config and verify all
+        bracket team names exist in the server's team list. If validation
+        fails, all subsequent API calls will be blocked.
+        """
+        self._bracket_teams = list(teams)
+        self._bracket_validated = False
+        self._validation_error = None
+
+    def game_config(self):
+        """Fetch game configuration from the CIX server.
+
+        Returns:
+            dict with game_name, game_type, scoring, teams, etc.
+        """
+        return self._post("game_config", _skip_validation=True)
+
+    def _validate_bracket(self):
+        """Validate bracket teams against CIX game config.
+
+        Called automatically on first API request when bracket_teams is set.
+        """
+        if self._bracket_validated:
+            return
+        if self._bracket_teams is None:
+            self._bracket_validated = True
+            return
+
+        config = self.game_config()
+        # game_config returns teams as {abbrev: full_name}
+        server_team_names = set(config["teams"].values())
+
+        missing = []
+        for team in self._bracket_teams:
+            if team not in server_team_names:
+                missing.append(team)
+
+        if missing:
+            msg = (
+                "Bracket team names do not match CIX game config!\n"
+                f"The following {len(missing)} team(s) from the bracket "
+                "are not in the CIX server's team list:\n"
+            )
+            for team in sorted(missing):
+                msg += f"  - {team!r}\n"
+            msg += "\nCIX server teams:\n"
+            for name in sorted(server_team_names):
+                msg += f"  - {name!r}\n"
+            msg += (
+                "\nAll CIX API calls are blocked until the bracket "
+                "configuration is fixed."
+            )
+            self._validation_error = msg
+            raise BracketMismatchError(msg)
+
+        self._bracket_validated = True
 
     def _post(self, endpoint, **params):
         """Make a POST request to the legacy API.
@@ -34,8 +96,17 @@ class CixClient:
 
         Raises:
             ApiException: If the API returns success=False.
+            BracketMismatchError: If bracket validation failed.
             requests.RequestException: On network/HTTP errors.
         """
+        skip_validation = params.pop("_skip_validation", False)
+
+        if not skip_validation:
+            if self._validation_error:
+                raise BracketMismatchError(self._validation_error)
+            if not self._bracket_validated:
+                self._validate_bracket()
+
         url = f"{self.base_url}/ncaa/api/{endpoint}"
         data = {"apid": self.apid, **params}
         response = self._session.post(url, data=data)

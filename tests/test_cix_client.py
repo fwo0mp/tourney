@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 from decimal import Decimal
 
 import cix_client
-from cix_client import CixClient, ApiException
+from cix_client import CixClient, ApiException, BracketMismatchError
 from cix_client.client import Portfolio
 
 
@@ -230,3 +230,138 @@ class TestTradeHistory:
         with patch.object(client, "_post", return_value=[]) as mock:
             client.open_orders()
         mock.assert_called_once_with("open_orders")
+
+
+class TestBracketValidation:
+    GAME_CONFIG = {
+        "game_name": "NCAA 2026",
+        "game_type": "tournament",
+        "teams": {
+            "DUKE": "Duke",
+            "UNC": "North Carolina",
+            "KU": "Kansas",
+            "UK": "Kentucky",
+        },
+    }
+
+    def _make_client(self, bracket_teams=None):
+        client = CixClient("test-apid", base_url="http://test:8000")
+        if bracket_teams is not None:
+            client.set_bracket_teams(bracket_teams)
+        return client
+
+    def _mock_post_for_validation(self, client):
+        """Return a mock that handles game_config and positions calls."""
+        original_post = client._post.__func__ if hasattr(client._post, '__func__') else None
+
+        def side_effect(endpoint, **params):
+            skip = params.pop("_skip_validation", False)
+            if endpoint == "game_config":
+                return self.GAME_CONFIG
+            return {"Duke": 10, "points": 500.0}
+
+        return side_effect
+
+    def test_validation_passes_when_all_teams_match(self):
+        client = self._make_client(["Duke", "North Carolina", "Kansas"])
+        mock_response = MagicMock()
+
+        call_count = 0
+        def fake_post(url, data):
+            nonlocal call_count
+            call_count += 1
+            mock_resp = MagicMock()
+            if call_count == 1:
+                # game_config call
+                mock_resp.json.return_value = {
+                    "success": True, "result": self.GAME_CONFIG,
+                }
+            else:
+                # actual call
+                mock_resp.json.return_value = {
+                    "success": True, "result": {"Duke": 10, "points": 500.0},
+                }
+            return mock_resp
+
+        with patch.object(client._session, "post", side_effect=fake_post):
+            result = client.my_positions(full_names=True)
+        assert result == {"Duke": 10, "points": 500.0}
+        assert client._bracket_validated
+
+    def test_validation_fails_with_missing_teams(self):
+        client = self._make_client(["Duke", "Gonzaga", "Baylor"])
+
+        def fake_post(url, data):
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = {
+                "success": True, "result": self.GAME_CONFIG,
+            }
+            return mock_resp
+
+        with patch.object(client._session, "post", side_effect=fake_post):
+            with pytest.raises(BracketMismatchError) as exc_info:
+                client.my_positions()
+            assert "Gonzaga" in str(exc_info.value)
+            assert "Baylor" in str(exc_info.value)
+
+    def test_validation_blocks_subsequent_calls(self):
+        client = self._make_client(["Duke", "Gonzaga"])
+
+        def fake_post(url, data):
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = {
+                "success": True, "result": self.GAME_CONFIG,
+            }
+            return mock_resp
+
+        with patch.object(client._session, "post", side_effect=fake_post):
+            with pytest.raises(BracketMismatchError):
+                client.my_positions()
+
+        # Subsequent call should also fail without hitting the network
+        with pytest.raises(BracketMismatchError):
+            client.market_data()
+
+    def test_no_validation_without_bracket_teams(self):
+        client = self._make_client()  # no bracket teams set
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True, "result": {"Duke": 10},
+        }
+        with patch.object(client._session, "post", return_value=mock_response):
+            result = client.my_positions(full_names=True)
+        assert result == {"Duke": 10}
+
+    def test_game_config_method(self):
+        client = self._make_client()
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "success": True, "result": self.GAME_CONFIG,
+        }
+        with patch.object(client._session, "post", return_value=mock_response):
+            config = client.game_config()
+        assert config == self.GAME_CONFIG
+        assert config["teams"]["DUKE"] == "Duke"
+
+    def test_set_bracket_teams_resets_validation(self):
+        client = self._make_client(["Duke"])
+
+        def fake_post(url, data):
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = {
+                "success": True, "result": self.GAME_CONFIG,
+            }
+            return mock_resp
+
+        # Validate successfully
+        with patch.object(client._session, "post", side_effect=fake_post):
+            client._validate_bracket()
+        assert client._bracket_validated
+
+        # Reset with new teams
+        client.set_bracket_teams(["Gonzaga"])
+        assert not client._bracket_validated
+        assert client._validation_error is None
+
+    def test_accessible_from_module(self):
+        assert cix_client.BracketMismatchError is BracketMismatchError

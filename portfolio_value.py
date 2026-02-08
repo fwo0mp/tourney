@@ -23,29 +23,7 @@ from tourney_core import (
 )
 
 import tourney_utils as tourney
-
-# Team name conversions for CIX API compatibility
-CIX_NAME_CONVERSIONS = {
-    "Michigan State": "Michigan St.",
-    "Southern California": "USC",
-    "Middle Tennessee State": "Middle Tennessee",
-    "Miami": "Miami FL",
-    "Iowa State": "Iowa St.",
-    "Kent State": "Kent St.",
-    "Nevada Reno": "Nevada",
-    "Virginia Commonwealth": "VCU",
-    "California Davis": "UC Davis",
-    "Wichita State": "Wichita St.",
-    "Florida State": "Florida St.",
-    "Alabma": "Alabama",
-    "Abilene Chrsitian": "Abilene Christian",
-    "Ohio University": "Ohio",
-    "Brigham Young": "BYU",
-    "Oregon State": "Oregon St.",
-    "Oklahoma State": "Oklahoma St.",
-}
-
-REVERSE_NAME_CONVERSIONS = dict((v, k) for k, v in CIX_NAME_CONVERSIONS.items())
+from team_names import try_resolve_name
 
 
 # Re-export Rust TeamDelta
@@ -139,7 +117,7 @@ def get_portfolio_value(positions, values):
             total_value += float(count) if isinstance(count, Decimal) else count
         else:
             # Apply name conversion
-            team_name = CIX_NAME_CONVERSIONS.get(team, team)
+            team_name = try_resolve_name(team, float_values)
             if isinstance(count, Decimal):
                 float_positions[team_name] = float(count)
             else:
@@ -172,7 +150,7 @@ def game_delta(positions, tournament, team1, team2):
     # Convert to named tuples with reverse name lookups for positions
     team_deltas = []
     for delta in rust_deltas:
-        position = positions.get(REVERSE_NAME_CONVERSIONS.get(delta.team, delta.team), 0)
+        position = positions.get(try_resolve_name(delta.team, positions), 0)
         if isinstance(position, Decimal):
             position = float(position)
         team_deltas.append(
@@ -315,8 +293,6 @@ def verify_get_all_team_deltas(positions, tournament, point_delta=1.0, tolerance
 __all__ = [
     "PortfolioState",
     "TeamDelta",
-    "CIX_NAME_CONVERSIONS",
-    "REVERSE_NAME_CONVERSIONS",
     "read_values",
     "get_portfolio_value",
     "game_delta",

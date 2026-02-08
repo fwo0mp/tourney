@@ -1,64 +1,64 @@
-Gonzaga
-Georgia St.
-Boise St.
-Memphis
-Connecticut
-New Mexico St.
-Arkansas
-Vermont
-Alabama
-Rutgers,Notre Dame
-Texas Tech
-Montana St.
-Michigan St.
-Davidson
 Duke
-Cal St. Fullerton
-Baylor
-Norfolk St.
-North Carolina
-Marquette
-Saint Mary's
-Wyoming,Indiana
-UCLA
-Akron
-Texas
-Virginia Tech
-Purdue
-Yale
-Murray St.
-San Francisco
-Kentucky
-Saint Peter's
-Arizona
-Wright St.,Bryant
-Seton Hall
-TCU
-Houston
-UAB
-Illinois
-Chattanooga
-Colorado St.
-Michigan
-Tennessee
-Longwood
-Ohio St.
-Loyola Chicago
-Villanova
-Delaware
-Kansas
-Texas Southern,Texas A&M Corpus Chris
-San Diego St.
+Mount St. Mary's,American
+Louisville
 Creighton
-Iowa
-Richmond
-Providence
-South Dakota St.
-LSU
-Iowa St.
-Wisconsin
-Colgate
+Memphis
+Colorado St.
+Maryland
+Grand Canyon
 USC
-Miami FL
+N.C. State,San Diego St.
+Iowa St.
+Lipscomb
+Florida St.
+New Mexico
+Alabama
+Robert Morris
 Auburn
-Jacksonville St.
+Alabama St.,Fairleigh Dickinson
+Mississippi St.
+Baylor
+Oregon
+Liberty
+Arizona
+Akron
+Illinois
+Xavier,Texas
+Kentucky
+Troy
+UCLA
+Utah State
+Michigan State
+Bryant
+Houston
+SIU Edwardsville
+Gonzaga
+Georgia
+Clemson
+McNeese
+Texas A&M
+Yale
+Missouri
+Drake
+Texas Tech
+Vermont
+Kansas
+Arkansas
+Tennessee
+Wofford
+Florida
+Norfolk State
+UConn
+Oklahoma
+Michigan
+Texas Southern
+Purdue
+High Point
+BYU
+VCU
+Wisconsin
+Montana
+St. Mary's
+Vanderbilt
+St. John's
+Omaha

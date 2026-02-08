@@ -2,11 +2,11 @@ import argparse
 from decimal import Decimal, ROUND_UP, ROUND_DOWN
 from dotenv import load_dotenv
 import os
-import re
 
 import cix_client
 import portfolio_value as pv
 import tourney_utils as tourney
+from team_names import try_resolve_name
 
 load_dotenv()
 
@@ -34,21 +34,9 @@ def get_spread(team, values, portfolio, base_margin=Decimal("0.05")):
     return bid, ask
 
 
-def canonicalize_name(name):
-    name_overrides = {
-        "Miami FL": "Miami (FL)",
-        "Texas A&M Corpus Chris": "Texas A&M Corpus Christi",
-        "Cal St. Fullerton": "CSU Fullerton",
-    }
-
-    try:
-        return name_overrides[name]
-    except KeyError:
-        pass
-
-    name = re.sub("St\.$", "State", name)
-    name = re.sub("^Saint", "St.", name)
-
+def canonicalize_name(name, cix_team_names=None):
+    if cix_team_names is not None:
+        return try_resolve_name(name, cix_team_names)
     return name
 
 
@@ -116,6 +104,9 @@ if __name__ == "__main__":
     if args.save_deltas:
         portfolio.store_deltas(args.save_deltas)
 
+    cix_config = client.game_config()
+    cix_team_names = set(cix_config["teams"].values())
+
     if args.teams:
         market_teams = args.teams
     else:
@@ -150,7 +141,7 @@ if __name__ == "__main__":
                 do_order = answer[0].lower() == "y"
             if do_order:
                 try:
-                    order_name = canonicalize_name(team)
+                    order_name = canonicalize_name(team, cix_team_names)
                     client.make_market(
                         order_name,
                         bid=bid,

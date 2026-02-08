@@ -27,13 +27,19 @@ class CIXService:
         """
         if self._client is None and not self._use_mock:
             import cix_client
+            from api.services.tournament_service import get_tournament_service
             apid = os.getenv("CIX_APID")
             if not apid:
                 raise RuntimeError(
                     "CIX_APID environment variable is not set. "
                     "Set CIX_APID to connect to CIX, or set USE_MOCK_DATA=true for development."
                 )
-            self._client = cix_client.CixClient(apid)
+            client = cix_client.CixClient(apid)
+            tournament = get_tournament_service()
+            if tournament.state is not None:
+                bracket_teams = tournament.state.get_bracket_teams()
+                client.set_bracket_teams(bracket_teams)
+            self._client = client
         return self._client
 
     def get_orderbook(self, team: str) -> dict:

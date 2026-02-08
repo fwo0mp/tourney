@@ -66,7 +66,12 @@ class PortfolioService:
                     "CIX_APID environment variable is not set. "
                     "Set CIX_APID to connect to CIX, or set USE_MOCK_DATA=true for development."
                 )
-            self._cix_client = cix_client.CixClient(apid)
+            client = cix_client.CixClient(apid)
+            tournament = get_tournament_service()
+            if tournament.state is not None:
+                bracket_teams = tournament.state.get_bracket_teams()
+                client.set_bracket_teams(bracket_teams)
+            self._cix_client = client
         return self._cix_client
 
     def get_positions(self) -> tuple[dict, bool]:
