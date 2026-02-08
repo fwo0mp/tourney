@@ -21,25 +21,24 @@ class CIXService:
         return cls._instance
 
     def _get_client(self):
-        """Get or create CIX client."""
-        if self._client is None and not self._use_mock:
-            apid = os.getenv("CIX_APID")
-            if apid:
-                try:
-                    import cix_client
-                    self._client = cix_client.CixClient(apid)
-                except ImportError:
-                    pass
-        return self._client
+        """Get or create CIX client.
 
-    def is_available(self) -> bool:
-        """Check if CIX client is available."""
-        return self._get_client() is not None
+        Raises RuntimeError if CIX_APID is not configured (and not in mock mode).
+        """
+        if self._client is None and not self._use_mock:
+            import cix_client
+            apid = os.getenv("CIX_APID")
+            if not apid:
+                raise RuntimeError(
+                    "CIX_APID environment variable is not set. "
+                    "Set CIX_APID to connect to CIX, or set USE_MOCK_DATA=true for development."
+                )
+            self._client = cix_client.CixClient(apid)
+        return self._client
 
     def get_orderbook(self, team: str) -> dict:
         """Get current orderbook for a team."""
         if self._use_mock:
-            # Return mock orderbook
             return {
                 "team": team,
                 "bids": [
@@ -54,20 +53,13 @@ class CIXService:
             }
 
         client = self._get_client()
-        if not client:
-            return {"team": team, "bids": [], "asks": [], "is_mock": True}
-
-        try:
-            # Note: Actual CIX client API may differ
-            orderbook = client.get_orderbook(team)
-            return {
-                "team": team,
-                "bids": orderbook.get("bids", []),
-                "asks": orderbook.get("asks", []),
-                "is_mock": False,
-            }
-        except Exception as e:
-            return {"team": team, "bids": [], "asks": [], "error": str(e), "is_mock": True}
+        orderbook = client.get_orderbook(team)
+        return {
+            "team": team,
+            "bids": orderbook.get("bids", []),
+            "asks": orderbook.get("asks", []),
+            "is_mock": False,
+        }
 
     def place_order(self, team: str, side: str, price: float, size: int) -> dict:
         """Place an order."""
@@ -83,32 +75,22 @@ class CIXService:
             }
 
         client = self._get_client()
-        if not client:
-            return {
-                "success": False,
-                "error": "CIX client not available",
-                "is_mock": True,
-            }
+        if side == "buy":
+            result = client.place_bid(team, price, size)
+        elif side == "sell":
+            result = client.place_ask(team, price, size)
+        else:
+            raise ValueError(f"Invalid side: {side}")
 
-        try:
-            if side == "buy":
-                result = client.place_bid(team, price, size)
-            elif side == "sell":
-                result = client.place_ask(team, price, size)
-            else:
-                return {"success": False, "error": f"Invalid side: {side}"}
-
-            return {
-                "success": True,
-                "order_id": result.get("order_id"),
-                "team": team,
-                "side": side,
-                "price": price,
-                "size": size,
-                "is_mock": False,
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        return {
+            "success": True,
+            "order_id": result.get("order_id"),
+            "team": team,
+            "side": side,
+            "price": price,
+            "size": size,
+            "is_mock": False,
+        }
 
     def cancel_order(self, order_id: str) -> dict:
         """Cancel an order."""
@@ -116,14 +98,8 @@ class CIXService:
             return {"success": True, "order_id": order_id, "is_mock": True}
 
         client = self._get_client()
-        if not client:
-            return {"success": False, "error": "CIX client not available"}
-
-        try:
-            client.cancel_order(order_id)
-            return {"success": True, "order_id": order_id, "is_mock": False}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        client.cancel_order(order_id)
+        return {"success": True, "order_id": order_id, "is_mock": False}
 
 
 def get_cix_service() -> CIXService:
