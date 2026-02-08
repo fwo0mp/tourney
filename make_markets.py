@@ -6,7 +6,6 @@ import os
 import cix_client
 import portfolio_value as pv
 import tourney_utils as tourney
-from team_names import try_resolve_name
 
 load_dotenv()
 
@@ -32,12 +31,6 @@ def get_spread(team, values, portfolio, base_margin=Decimal("0.05")):
     ask = base_ask.quantize(Decimal("0.01"), rounding=ROUND_UP)
 
     return bid, ask
-
-
-def canonicalize_name(name, cix_team_names=None):
-    if cix_team_names is not None:
-        return try_resolve_name(name, cix_team_names)
-    return name
 
 
 if __name__ == "__main__":
@@ -104,9 +97,6 @@ if __name__ == "__main__":
     if args.save_deltas:
         portfolio.store_deltas(args.save_deltas)
 
-    cix_config = client.game_config()
-    cix_team_names = set(cix_config["teams"].values())
-
     if args.teams:
         market_teams = args.teams
     else:
@@ -141,9 +131,8 @@ if __name__ == "__main__":
                 do_order = answer[0].lower() == "y"
             if do_order:
                 try:
-                    order_name = canonicalize_name(team, cix_team_names)
                     client.make_market(
-                        order_name,
+                        team,
                         bid=bid,
                         bid_size=args.order_size,
                         ask=ask,

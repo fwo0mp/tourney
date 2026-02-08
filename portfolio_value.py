@@ -23,7 +23,6 @@ from tourney_core import (
 )
 
 import tourney_utils as tourney
-from team_names import try_resolve_name
 
 
 # Re-export Rust TeamDelta
@@ -96,7 +95,7 @@ def get_portfolio_value(positions, values):
     """
     Calculate total portfolio value.
 
-    Handles CIX name conversions and special 'points' entry.
+    Handles special 'points' entry and Decimal→float conversion.
     """
     # Convert to float dict for Rust
     float_values = {}
@@ -116,12 +115,10 @@ def get_portfolio_value(positions, values):
         if team == "points":
             total_value += float(count) if isinstance(count, Decimal) else count
         else:
-            # Apply name conversion
-            team_name = try_resolve_name(team, float_values)
             if isinstance(count, Decimal):
-                float_positions[team_name] = float(count)
+                float_positions[team] = float(count)
             else:
-                float_positions[team_name] = count
+                float_positions[team] = count
 
     # Use Rust implementation for the main calculation
     total_value += _rust_get_portfolio_value(float_positions, float_values)
@@ -147,10 +144,10 @@ def game_delta(positions, tournament, team1, team2):
         float_positions, tournament, team1, team2
     )
 
-    # Convert to named tuples with reverse name lookups for positions
+    # Convert to named tuples with position lookups
     team_deltas = []
     for delta in rust_deltas:
-        position = positions.get(try_resolve_name(delta.team, positions), 0)
+        position = positions.get(delta.team, 0)
         if isinstance(position, Decimal):
             position = float(position)
         team_deltas.append(

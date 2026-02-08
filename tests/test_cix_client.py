@@ -365,3 +365,129 @@ class TestBracketValidation:
 
     def test_accessible_from_module(self):
         assert cix_client.BracketMismatchError is BracketMismatchError
+
+    def test_validation_with_equivalence_classes(self):
+        """Bracket names that differ from CIX names but are equivalent should pass."""
+        game_config = {
+            "game_name": "NCAA 2026",
+            "game_type": "tournament",
+            "teams": {
+                "CONN": "UConn",
+                "NCST": "NC State",
+                "MSU": "Michigan St.",
+            },
+        }
+        # Bracket uses canonical names that differ from CIX names
+        client = self._make_client(["Connecticut", "N.C. State", "Michigan State"])
+
+        call_count = 0
+        def fake_post(url, data):
+            nonlocal call_count
+            call_count += 1
+            mock_resp = MagicMock()
+            if call_count == 1:
+                mock_resp.json.return_value = {
+                    "success": True, "result": game_config,
+                }
+            else:
+                mock_resp.json.return_value = {
+                    "success": True, "result": {"UConn": 10, "NC State": 5},
+                }
+            return mock_resp
+
+        with patch.object(client._session, "post", side_effect=fake_post):
+            result = client.my_positions(full_names=True)
+        assert client._bracket_validated
+        # Positions should be translated back to canonical/bracket names
+        assert result == {"Connecticut": 10, "N.C. State": 5}
+
+    def test_to_cix_name_after_validation(self):
+        """to_cix_name should translate bracket names to CIX server names."""
+        game_config = {
+            "game_name": "NCAA 2026",
+            "game_type": "tournament",
+            "teams": {"CONN": "UConn"},
+        }
+        client = self._make_client(["Connecticut"])
+
+        def fake_post(url, data):
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = {
+                "success": True, "result": game_config,
+            }
+            return mock_resp
+
+        with patch.object(client._session, "post", side_effect=fake_post):
+            client._validate_bracket()
+
+        assert client.to_cix_name("Connecticut") == "UConn"
+        # Unknown names pass through unchanged
+        assert client.to_cix_name("Unknown Team") == "Unknown Team"
+
+    def test_from_cix_name_after_validation(self):
+        """from_cix_name should translate CIX server names back to bracket names."""
+        game_config = {
+            "game_name": "NCAA 2026",
+            "game_type": "tournament",
+            "teams": {"CONN": "UConn"},
+        }
+        client = self._make_client(["Connecticut"])
+
+        def fake_post(url, data):
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = {
+                "success": True, "result": game_config,
+            }
+            return mock_resp
+
+        with patch.object(client._session, "post", side_effect=fake_post):
+            client._validate_bracket()
+
+        assert client.from_cix_name("UConn") == "Connecticut"
+        assert client.from_cix_name("Unknown Team") == "Unknown Team"
+
+    def test_outgoing_methods_translate_names(self):
+        """Outgoing API methods should translate to CIX names."""
+        client = self._make_client()
+        client._to_cix = {"Connecticut": "UConn"}
+        client._bracket_validated = True
+
+        with patch.object(client, "_post") as mock:
+            client.get_orderbook("Connecticut")
+        mock.assert_called_once_with("get_book", team="UConn", depth="5")
+
+        with patch.object(client, "_post") as mock:
+            client.place_bid("Connecticut", 2.50, 100)
+        mock.assert_called_once_with(
+            "place_order",
+            team_identifier="UConn", side="buy",
+            price="2.5", quantity="100",
+        )
+
+        with patch.object(client, "_post") as mock:
+            client.place_ask("Connecticut", 3.00, 50)
+        mock.assert_called_once_with(
+            "place_order",
+            team_identifier="UConn", side="sell",
+            price="3.0", quantity="50",
+        )
+
+        with patch.object(client, "_post") as mock:
+            client.make_market("Connecticut", bid=Decimal("2.50"),
+                               bid_size=5000, ask=Decimal("2.60"), ask_size=5000)
+        mock.assert_called_once_with(
+            "make_market",
+            team="UConn", bid="2.50", bid_size="5000",
+            ask="2.60", ask_size="5000",
+        )
+
+    def test_set_bracket_teams_resets_mappings(self):
+        """Resetting bracket teams should clear name mappings."""
+        client = self._make_client()
+        client._to_cix = {"Connecticut": "UConn"}
+        client._from_cix = {"UConn": "Connecticut"}
+        client._bracket_validated = True
+
+        client.set_bracket_teams(["Duke"])
+        assert client._to_cix == {}
+        assert client._from_cix == {}

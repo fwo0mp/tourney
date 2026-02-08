@@ -5,7 +5,6 @@ import json
 import sys
 
 import tourney_utils_reference as tourney
-from team_names import try_resolve_name
 
 class PortfolioState:
     def __init__(self, tournament, positions, point_delta=Decimal(1)):
@@ -55,8 +54,7 @@ def get_portfolio_value(positions, values):
             total_value += Decimal(count)
         else:
             try:
-                team_name = try_resolve_name(team, values)
-                value = values[team_name]
+                value = values[team]
             except KeyError:
                 print('missing team ' + team)
                 value = Decimal(0)
@@ -84,7 +82,7 @@ def game_delta(positions, tournament, team1, team2):
 
     team_deltas = list()
     for team, value in sorted(win_values.items(), key=(lambda kv: kv[0])):
-        position = positions.get(try_resolve_name(team, positions), 0)
+        position = positions.get(team, 0)
         delta_per_share = value - loss_values[team]
         team_deltas.append(TeamDelta(
             team=team,
