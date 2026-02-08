@@ -498,7 +498,62 @@ function RegionBracket({
         const team2WonGame = completedWinners.has(playIn.team2);
         const team2Eliminated = eliminatedTeams.has(playIn.team2);
 
-        // Team 1 slot (top)
+        // Draw game box FIRST (background, behind team slots in SVG z-order)
+        const boxTop = team1Y - gameBoxPadding;
+        const boxBottom = team2Y + slotHeight + gameBoxPadding;
+        const playInSelected = selectedGame &&
+          ((selectedGame.team1 === playIn.team1 && selectedGame.team2 === playIn.team2) ||
+           (selectedGame.team1 === playIn.team2 && selectedGame.team2 === playIn.team1));
+        const playInCompleted = isGameCompleted(playIn.team1, playIn.team2);
+
+        const piGameKey = makeGameKey(playIn.team1, playIn.team2);
+        const piImportance = gameImportanceMap?.get(piGameKey) ?? 0;
+        const piDefaultFill = maxImportance ? getImportanceColor(piImportance, maxImportance) : 'rgba(219, 234, 254, 0.6)';
+
+        playInGroup.append('rect')
+          .attr('x', playInX - gameBoxPadding)
+          .attr('y', boxTop)
+          .attr('width', slotWidth + gameBoxPadding * 2)
+          .attr('height', boxBottom - boxTop)
+          .attr('rx', 5)
+          .attr('fill', playInSelected ? 'rgba(59, 130, 246, 0.15)' : piDefaultFill)
+          .attr('stroke', playInSelected ? '#3b82f6' : '#93c5fd')
+          .attr('stroke-width', playInSelected ? 2 : 1)
+          .attr('cursor', playInCompleted ? 'default' : 'pointer')
+          .on('click', (event: MouseEvent) => {
+            event.stopPropagation();
+            if (!playInCompleted) {
+              selectGame({ team1: playIn.team1, team2: playIn.team2, bothConfirmedFromCompleted: true });
+            }
+          })
+          .on('mouseenter', function() {
+            if (!playInCompleted) {
+              d3.select(this)
+                .attr('fill', 'rgba(59, 130, 246, 0.15)')
+                .attr('stroke', '#3b82f6');
+            }
+          })
+          .on('mouseleave', function() {
+            const stillSelected = selectedGame &&
+              ((selectedGame.team1 === playIn.team1 && selectedGame.team2 === playIn.team2) ||
+               (selectedGame.team1 === playIn.team2 && selectedGame.team2 === playIn.team1));
+            d3.select(this)
+              .attr('fill', stillSelected ? 'rgba(59, 130, 246, 0.15)' : piDefaultFill)
+              .attr('stroke', stillSelected ? '#3b82f6' : '#93c5fd');
+          });
+
+        // "vs" label between the two teams
+        const vsY = (team1Y + slotHeight + team2Y) / 2;
+        playInGroup.append('text')
+          .attr('x', playInX + slotWidth / 2)
+          .attr('y', vsY + 3)
+          .attr('text-anchor', 'middle')
+          .attr('font-size', '8px')
+          .attr('font-weight', '600')
+          .attr('fill', '#9ca3af')
+          .text('vs');
+
+        // Team 1 slot (top) — drawn after game box so it appears on top
         const team1Group = playInGroup.append('g')
           .attr('transform', `translate(${playInX}, ${team1Y})`)
           .attr('cursor', 'pointer')
@@ -599,61 +654,6 @@ function RegionBracket({
           .attr('font-size', '8px')
           .attr('fill', '#6b7280')
           .text(`${Math.round(playIn.team2_prob * 100)}%`);
-
-        // Draw game box around both teams
-        const boxTop = team1Y - gameBoxPadding;
-        const boxBottom = team2Y + slotHeight + gameBoxPadding;
-        const playInSelected = selectedGame &&
-          ((selectedGame.team1 === playIn.team1 && selectedGame.team2 === playIn.team2) ||
-           (selectedGame.team1 === playIn.team2 && selectedGame.team2 === playIn.team1));
-        const playInCompleted = isGameCompleted(playIn.team1, playIn.team2);
-
-        const piGameKey = makeGameKey(playIn.team1, playIn.team2);
-        const piImportance = gameImportanceMap?.get(piGameKey) ?? 0;
-        const piDefaultFill = maxImportance ? getImportanceColor(piImportance, maxImportance) : 'rgba(219, 234, 254, 0.6)';
-
-        playInGroup.append('rect')
-          .attr('x', playInX - gameBoxPadding)
-          .attr('y', boxTop)
-          .attr('width', slotWidth + gameBoxPadding * 2)
-          .attr('height', boxBottom - boxTop)
-          .attr('rx', 5)
-          .attr('fill', playInSelected ? 'rgba(59, 130, 246, 0.15)' : piDefaultFill)
-          .attr('stroke', playInSelected ? '#3b82f6' : '#93c5fd')
-          .attr('stroke-width', playInSelected ? 2 : 1)
-          .attr('cursor', playInCompleted ? 'default' : 'pointer')
-          .on('click', (event: MouseEvent) => {
-            event.stopPropagation();
-            if (!playInCompleted) {
-              selectGame({ team1: playIn.team1, team2: playIn.team2, bothConfirmedFromCompleted: true });
-            }
-          })
-          .on('mouseenter', function() {
-            if (!playInCompleted) {
-              d3.select(this)
-                .attr('fill', 'rgba(59, 130, 246, 0.15)')
-                .attr('stroke', '#3b82f6');
-            }
-          })
-          .on('mouseleave', function() {
-            const stillSelected = selectedGame &&
-              ((selectedGame.team1 === playIn.team1 && selectedGame.team2 === playIn.team2) ||
-               (selectedGame.team1 === playIn.team2 && selectedGame.team2 === playIn.team1));
-            d3.select(this)
-              .attr('fill', stillSelected ? 'rgba(59, 130, 246, 0.15)' : piDefaultFill)
-              .attr('stroke', stillSelected ? '#3b82f6' : '#93c5fd');
-          });
-
-        // Add "vs" label between the two teams
-        const vsY = (team1Y + slotHeight + team2Y) / 2;
-        playInGroup.append('text')
-          .attr('x', playInX + slotWidth / 2)
-          .attr('y', vsY + 3)
-          .attr('text-anchor', 'middle')
-          .attr('font-size', '8px')
-          .attr('font-weight', '600')
-          .attr('fill', '#9ca3af')
-          .text('vs');
 
         // Draw line connecting play-in to round 0 slot
         // Calculate round 0 X position (same formula as slots above)

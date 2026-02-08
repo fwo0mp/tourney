@@ -59,7 +59,7 @@ class TournamentService:
         # Load bracket
         games = tourney.read_games_from_file(bracket_path, self.ratings, overrides)
 
-        # Create tournament state
+        # Create tournament state (expands ratings with equivalence classes)
         self.state = tourney.TournamentState(
             bracket=games,
             ratings=self.ratings,
@@ -67,6 +67,9 @@ class TournamentService:
             overrides=overrides,
             forfeit_prob=0.0,
         )
+
+        # Use expanded ratings (includes all name variants from equivalence classes)
+        self.ratings = self.state.ratings
 
         # Load and apply completed games
         self.completed_games = self.load_completed_games()
