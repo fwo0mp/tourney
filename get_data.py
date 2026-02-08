@@ -13,6 +13,7 @@ import urllib3
 
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+from team_names import canonical_name
 
 load_dotenv()
 
@@ -27,6 +28,8 @@ ODDS_API_URL = "https://api.the-odds-api.com/v4/sports/basketball_ncaab/odds?api
 )
 CHROME_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
 
+# Scraping-specific name fixes for ESPN bracket data.
+# For cross-source name resolution (CIX, KenPom, odds API), see team_names.py.
 NAME_CONVERSIONS = {
     "Miami": "Miami FL",
     "Southern Cal": "USC",
@@ -107,7 +110,8 @@ def clean_name(s):
         word = WORD_CONVERSIONS.get(word, word)
         words[i] = word
     cleaned = " ".join(words)
-    return NAME_CONVERSIONS.get(cleaned, cleaned)
+    cleaned = NAME_CONVERSIONS.get(cleaned, cleaned)
+    return canonical_name(cleaned)
 
 
 def clean_api_name(s):
@@ -151,7 +155,7 @@ def get_ratings(out_file):
         data_columns = row.find_all("td", {"class": "td-left"})
         if not columns or not data_columns or len(data_columns) < 3:
             continue
-        team_name = columns[1].a.string
+        team_name = canonical_name(columns[1].a.string)
         offense = data_columns[0].string
         defense = data_columns[1].string
         tempo = data_columns[2].string

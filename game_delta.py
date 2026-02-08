@@ -56,7 +56,7 @@ if __name__ == "__main__":
     overrides = tourney.OverridesMap()
     if args.overrides:
         for override_file in args.overrides:
-            overrides.read_from_file(override_file)
+            tourney.read_overrides_file(overrides, override_file)
     bracket = tourney.read_games_from_file(args.bracket_file, ratings, overrides)
 
     client = cix_client.CixClient(os.environ["CIX_APID"])

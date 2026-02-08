@@ -34,17 +34,44 @@ pub struct TournamentState {
 #[pymethods]
 impl TournamentState {
     #[new]
-    #[pyo3(signature = (bracket, ratings, scoring, overrides = None, forfeit_prob = 0.0))]
+    #[pyo3(signature = (bracket, ratings, scoring, overrides = None, forfeit_prob = 0.0, equivalence_classes = None))]
     pub fn new(
         bracket: Vec<HashMap<String, f64>>,
         ratings: HashMap<String, Team>,
         scoring: Vec<f64>,
         overrides: Option<OverridesMap>,
         forfeit_prob: f64,
+        equivalence_classes: Option<Vec<Vec<String>>>,
     ) -> Self {
+        let mut expanded_ratings = ratings;
+
+        // Expand ratings to include all equivalent name variants
+        if let Some(classes) = equivalence_classes {
+            for class in &classes {
+                // Find which name in the class exists in ratings
+                let mut found_team: Option<Team> = None;
+                for name in class {
+                    if let Some(team) = expanded_ratings.get(name) {
+                        found_team = Some(team.clone());
+                        break;
+                    }
+                }
+                // Add all other variant names pointing to cloned Teams
+                if let Some(team) = found_team {
+                    for name in class {
+                        if !expanded_ratings.contains_key(name) {
+                            let mut alias = team.clone();
+                            alias.name = name.clone();
+                            expanded_ratings.insert(name.clone(), alias);
+                        }
+                    }
+                }
+            }
+        }
+
         TournamentState {
             bracket,
-            ratings,
+            ratings: expanded_ratings,
             scoring,
             overrides: overrides.unwrap_or_default(),
             forfeit_prob,
@@ -249,7 +276,7 @@ mod tests {
         let (bracket, ratings) = make_simple_bracket();
         let scoring = ROUND_POINTS.to_vec();
 
-        let state = TournamentState::new(bracket, ratings, scoring, None, 0.0);
+        let state = TournamentState::new(bracket, ratings, scoring, None, 0.0, None);
         let scores = state.calculate_scores_prob();
 
         // All 4 teams should have scores
@@ -275,7 +302,7 @@ mod tests {
         let (bracket, ratings) = make_simple_bracket();
         let scoring = ROUND_POINTS.to_vec();
 
-        let state = TournamentState::new(bracket, ratings, scoring, None, 0.0);
+        let state = TournamentState::new(bracket, ratings, scoring, None, 0.0, None);
 
         // With same seed, should get same result
         let scores1 = state.calculate_scores_sim(Some(42));
@@ -290,7 +317,7 @@ mod tests {
     #[test]
     fn test_get_bracket_teams() {
         let (bracket, ratings) = make_simple_bracket();
-        let state = TournamentState::new(bracket, ratings, vec![1.0, 1.0], None, 0.0);
+        let state = TournamentState::new(bracket, ratings, vec![1.0, 1.0], None, 0.0, None);
 
         let teams = state.get_bracket_teams();
         assert_eq!(teams.len(), 4);

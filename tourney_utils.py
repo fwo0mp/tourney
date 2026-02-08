@@ -7,9 +7,8 @@ but uses Rust for the core calculations (85-318x faster).
 For the original Python reference implementation, see tourney_utils_reference.py.
 """
 
+import csv
 from decimal import Decimal
-import tempfile
-import os
 
 from tourney_core import (
     Team as _RustTeam,
@@ -17,15 +16,14 @@ from tourney_core import (
     TournamentState as _RustTournamentState,
     py_calculate_win_prob as _rust_calculate_win_prob,
     py_game_transform_prob as _rust_game_transform_prob,
-    read_ratings_file as _rust_read_ratings_file,
-    read_adjustments_file as _rust_read_adjustments_file,
-    read_games_from_file as _rust_read_games_from_file,
     AVG_SCORING,
     AVG_TEMPO,
     SCORING_STDDEV,
     ROUND_POINTS,
     CALCUTTA_POINTS,
 )
+
+from team_names import EQUIVALENCE_CLASSES, resolve_name
 
 # Compatibility: track overrides used (approximation - Rust doesn't track this)
 overrides_used = 0
@@ -34,7 +32,17 @@ total_overrides = 0
 # Re-export Rust classes directly
 Team = _RustTeam
 OverridesMap = _RustOverridesMap
-TournamentState = _RustTournamentState
+
+# Pre-compute equivalence class lists for passing to Rust
+_EQUIV_LISTS = [list(ec) for ec in EQUIVALENCE_CLASSES]
+
+
+def TournamentState(bracket, ratings, scoring, overrides=None, forfeit_prob=0.0):
+    """Create a TournamentState with equivalence classes auto-injected."""
+    return _RustTournamentState(
+        bracket, ratings, scoring, overrides, forfeit_prob,
+        equivalence_classes=_EQUIV_LISTS,
+    )
 
 
 def calculate_win_prob(team1, team2, overrides=None, forfeit_prob=0.0):
@@ -55,17 +63,23 @@ def read_adjustments_file(in_file):
     Returns dict mapping team names to adjustment values.
     """
     if isinstance(in_file, str):
-        # It's a path
-        return _rust_read_adjustments_file(in_file)
+        with open(in_file) as f:
+            lines = f.readlines()
     else:
-        # It's a file object - write to temp file and read
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as tmp:
-            tmp.write(in_file.read())
-            tmp_path = tmp.name
-        try:
-            return _rust_read_adjustments_file(tmp_path)
-        finally:
-            os.unlink(tmp_path)
+        lines = in_file.readlines()
+
+    adjustments = {}
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split("|")
+        if len(parts) != 2:
+            continue
+        name = parts[0]
+        adj_str = parts[1].lstrip("+")
+        adjustments[name] = float(adj_str)
+    return adjustments
 
 
 def read_ratings_file(in_file, adjustments=None):
@@ -76,22 +90,74 @@ def read_ratings_file(in_file, adjustments=None):
     Returns dict mapping team names to Team objects.
     """
     if isinstance(in_file, str):
-        # It's a path
-        return _rust_read_ratings_file(in_file, adjustments)
+        with open(in_file) as f:
+            lines = f.readlines()
     else:
-        # It's a file object - write to temp file and read
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as tmp:
-            tmp.write(in_file.read())
-            tmp_path = tmp.name
-        try:
-            return _rust_read_ratings_file(tmp_path, adjustments)
-        finally:
-            os.unlink(tmp_path)
+        lines = in_file.readlines()
+
+    ratings = {}
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split("|")
+        if len(parts) < 4:
+            continue
+        name = parts[0]
+        offense = float(parts[1])
+        defense = float(parts[2])
+        tempo = float(parts[3])
+
+        if adjustments and name in adjustments:
+            offense += adjustments[name]
+            defense -= adjustments[name]
+
+        ratings[name] = Team(name, offense, defense, tempo, adjust=True)
+    return ratings
+
+
+def read_overrides_file(overrides_map, filepath):
+    """Read overrides from a CSV file into an OverridesMap.
+
+    Format: team1,team2,probability
+    """
+    with open(filepath, "rt") as f:
+        reader = csv.reader(f)
+        for row in reader:
+            if not row or len(row) != 3:
+                continue
+            name1, name2 = row[0].strip(), row[1].strip()
+            prob = float(row[2].strip())
+            overrides_map.add_override(name1, name2, prob)
 
 
 def read_games_from_file(filepath, ratings, overrides=None):
-    """Read bracket games from file."""
-    return _rust_read_games_from_file(filepath, ratings, overrides)
+    """Read bracket games from file.
+
+    Uses team name equivalence classes to resolve bracket names
+    against the ratings dictionary.
+    """
+    games = []
+    with open(filepath, "rt") as f:
+        reader = csv.reader(f)
+        for row in reader:
+            if not row:
+                continue
+            if len(row) == 1:
+                name = row[0].strip()
+                games.append({name: 1.0})
+            elif len(row) == 2:
+                name1, name2 = row[0].strip(), row[1].strip()
+                key1 = resolve_name(name1, ratings)
+                key2 = resolve_name(name2, ratings)
+                team1 = ratings[key1]
+                team2 = ratings[key2]
+                win_prob = calculate_win_prob(team1, team2, overrides, 0.0)
+                games.append({name1: win_prob, name2: 1.0 - win_prob})
+
+    if not games or (len(games) & (len(games) - 1)):
+        raise ValueError("Bracket must have a power-of-2 number of teams")
+    return games
 
 
 def get_bracket_teams(bracket):
@@ -185,6 +251,7 @@ __all__ = [
     'game_transform_prob',
     'read_ratings_file',
     'read_adjustments_file',
+    'read_overrides_file',
     'read_games_from_file',
     'get_bracket_teams',
     'AVG_SCORING',

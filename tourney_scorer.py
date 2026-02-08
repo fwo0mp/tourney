@@ -153,7 +153,7 @@ def main():
     overrides = tourney.OverridesMap()
     if args.overrides:
         for overrides_file in args.overrides:
-            overrides.read_from_file(overrides_file)
+            tourney.read_overrides_file(overrides, overrides_file)
 
     # Load bracket
     games = tourney.read_games_from_file(args.bracket_file, ratings, overrides)

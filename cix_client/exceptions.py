@@ -11,3 +11,11 @@ class ApiException(Exception):
         else:
             self.errors = [errors]
         super().__init__(", ".join(self.errors))
+
+
+class BracketMismatchError(Exception):
+    """Raised when bracket team names don't match CIX game config.
+
+    This blocks all further CIX API calls until the bracket is fixed.
+    """
+    pass

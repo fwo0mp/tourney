@@ -24,29 +24,6 @@ from tourney_core import (
 
 import tourney_utils as tourney
 
-# Team name conversions for CIX API compatibility
-CIX_NAME_CONVERSIONS = {
-    "Michigan State": "Michigan St.",
-    "Southern California": "USC",
-    "Middle Tennessee State": "Middle Tennessee",
-    "Miami": "Miami FL",
-    "Iowa State": "Iowa St.",
-    "Kent State": "Kent St.",
-    "Nevada Reno": "Nevada",
-    "Virginia Commonwealth": "VCU",
-    "California Davis": "UC Davis",
-    "Wichita State": "Wichita St.",
-    "Florida State": "Florida St.",
-    "Alabma": "Alabama",
-    "Abilene Chrsitian": "Abilene Christian",
-    "Ohio University": "Ohio",
-    "Brigham Young": "BYU",
-    "Oregon State": "Oregon St.",
-    "Oklahoma State": "Oklahoma St.",
-}
-
-REVERSE_NAME_CONVERSIONS = dict((v, k) for k, v in CIX_NAME_CONVERSIONS.items())
-
 
 # Re-export Rust TeamDelta
 TeamDelta = _RustTeamDelta
@@ -118,7 +95,7 @@ def get_portfolio_value(positions, values):
     """
     Calculate total portfolio value.
 
-    Handles CIX name conversions and special 'points' entry.
+    Handles special 'points' entry and Decimal→float conversion.
     """
     # Convert to float dict for Rust
     float_values = {}
@@ -138,12 +115,10 @@ def get_portfolio_value(positions, values):
         if team == "points":
             total_value += float(count) if isinstance(count, Decimal) else count
         else:
-            # Apply name conversion
-            team_name = CIX_NAME_CONVERSIONS.get(team, team)
             if isinstance(count, Decimal):
-                float_positions[team_name] = float(count)
+                float_positions[team] = float(count)
             else:
-                float_positions[team_name] = count
+                float_positions[team] = count
 
     # Use Rust implementation for the main calculation
     total_value += _rust_get_portfolio_value(float_positions, float_values)
@@ -157,22 +132,31 @@ def game_delta(positions, tournament, team1, team2):
 
     Returns (win_value, loss_value, team_deltas).
     """
-    # Convert positions to float
+    # Convert positions to float, separating out 'points' (cash)
+    cash = 0.0
     float_positions = {}
     for k, v in positions.items():
         if isinstance(v, Decimal):
-            float_positions[k] = float(v)
+            fv = float(v)
         else:
-            float_positions[k] = v
+            fv = v
+        if k == "points":
+            cash = fv
+        else:
+            float_positions[k] = fv
 
     win_value, loss_value, rust_deltas = _rust_game_delta(
         float_positions, tournament, team1, team2
     )
 
-    # Convert to named tuples with reverse name lookups for positions
+    # Add cash back — it's constant regardless of game outcome
+    win_value += cash
+    loss_value += cash
+
+    # Convert to named tuples with position lookups
     team_deltas = []
     for delta in rust_deltas:
-        position = positions.get(REVERSE_NAME_CONVERSIONS.get(delta.team, delta.team), 0)
+        position = positions.get(delta.team, 0)
         if isinstance(position, Decimal):
             position = float(position)
         team_deltas.append(
@@ -315,8 +299,6 @@ def verify_get_all_team_deltas(positions, tournament, point_delta=1.0, tolerance
 __all__ = [
     "PortfolioState",
     "TeamDelta",
-    "CIX_NAME_CONVERSIONS",
-    "REVERSE_NAME_CONVERSIONS",
     "read_values",
     "get_portfolio_value",
     "game_delta",

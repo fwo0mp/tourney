@@ -3,7 +3,8 @@ from collections import namedtuple
 
 import requests
 
-from cix_client.exceptions import ApiException
+from cix_client.exceptions import ApiException, BracketMismatchError
+from team_names import resolve_name
 
 Portfolio = namedtuple("Portfolio", ["cash"])
 
@@ -21,6 +22,86 @@ class CixClient:
             base_url or os.getenv("CIX_BASE_URL", "http://localhost:8000")
         ).rstrip("/")
         self._session = requests.Session()
+        self._bracket_teams = None
+        self._bracket_validated = False
+        self._validation_error = None
+        self._to_cix = {}    # canonical/bracket name → CIX server name
+        self._from_cix = {}  # CIX server name → canonical/bracket name
+
+    def set_bracket_teams(self, teams):
+        """Set bracket team names for validation against CIX game config.
+
+        When set, the first API call will fetch game_config and verify all
+        bracket team names exist in the server's team list. If validation
+        fails, all subsequent API calls will be blocked.
+        """
+        self._bracket_teams = list(teams)
+        self._bracket_validated = False
+        self._validation_error = None
+        self._to_cix = {}
+        self._from_cix = {}
+
+    def game_config(self):
+        """Fetch game configuration from the CIX server.
+
+        Returns:
+            dict with game_name, game_type, scoring, teams, etc.
+        """
+        return self._post("game_config", _skip_validation=True)
+
+    def _validate_bracket(self):
+        """Validate bracket teams against CIX game config.
+
+        Called automatically on first API request when bracket_teams is set.
+        Builds bidirectional name mappings (canonical↔CIX) using equivalence
+        classes from team_names.
+        """
+        if self._bracket_validated:
+            return
+        if self._bracket_teams is None:
+            self._bracket_validated = True
+            return
+
+        config = self.game_config()
+        # game_config returns teams as {abbrev: full_name}
+        server_team_names = set(config["teams"].values())
+
+        missing = []
+        for team in self._bracket_teams:
+            try:
+                cix_name = resolve_name(team, server_team_names)
+                self._to_cix[team] = cix_name
+                self._from_cix[cix_name] = team
+            except KeyError:
+                missing.append(team)
+
+        if missing:
+            msg = (
+                "Bracket team names do not match CIX game config!\n"
+                f"The following {len(missing)} team(s) from the bracket "
+                "are not in the CIX server's team list:\n"
+            )
+            for team in sorted(missing):
+                msg += f"  - {team!r}\n"
+            msg += "\nCIX server teams:\n"
+            for name in sorted(server_team_names):
+                msg += f"  - {name!r}\n"
+            msg += (
+                "\nAll CIX API calls are blocked until the bracket "
+                "configuration is fixed."
+            )
+            self._validation_error = msg
+            raise BracketMismatchError(msg)
+
+        self._bracket_validated = True
+
+    def to_cix_name(self, name):
+        """Translate a canonical/bracket name to the CIX server name."""
+        return self._to_cix.get(name, name)
+
+    def from_cix_name(self, name):
+        """Translate a CIX server name to the canonical/bracket name."""
+        return self._from_cix.get(name, name)
 
     def _post(self, endpoint, **params):
         """Make a POST request to the legacy API.
@@ -34,8 +115,17 @@ class CixClient:
 
         Raises:
             ApiException: If the API returns success=False.
+            BracketMismatchError: If bracket validation failed.
             requests.RequestException: On network/HTTP errors.
         """
+        skip_validation = params.pop("_skip_validation", False)
+
+        if not skip_validation:
+            if self._validation_error:
+                raise BracketMismatchError(self._validation_error)
+            if not self._bracket_validated:
+                self._validate_bracket()
+
         url = f"{self.base_url}/ncaa/api/{endpoint}"
         data = {"apid": self.apid, **params}
         response = self._session.post(url, data=data)
@@ -57,10 +147,14 @@ class CixClient:
 
         Returns:
             dict mapping team names to share counts, plus a "points" key
-            with the cash/points balance.
+            with the cash/points balance.  When full_names=True, CIX names
+            are translated back to canonical/bracket names.
         """
         name_type = "full" if full_names else "abbrev"
-        return self._post("positions", name=name_type)
+        positions = self._post("positions", name=name_type)
+        if full_names and self._from_cix:
+            return {self.from_cix_name(k): v for k, v in positions.items()}
+        return positions
 
     def my_portfolio(self):
         """Get portfolio summary with cash balance.
@@ -86,7 +180,7 @@ class CixClient:
         """
         self._post(
             "make_market",
-            team=str(team),
+            team=str(self.to_cix_name(team)),
             bid=str(bid),
             bid_size=str(bid_size),
             ask=str(ask),
@@ -106,7 +200,7 @@ class CixClient:
             dict with 'bids' and 'asks' lists. Each entry has
             'price', 'quantity', 'entry' keys.
         """
-        result = self._post("get_book", team=str(team), depth=str(depth))
+        result = self._post("get_book", team=str(self.to_cix_name(team)), depth=str(depth))
         if result:
             result["bids"] = list(result.get("bids", []))
             result["asks"] = list(result.get("asks", []))
@@ -122,7 +216,7 @@ class CixClient:
         """
         return self._post(
             "place_order",
-            team_identifier=str(team),
+            team_identifier=str(self.to_cix_name(team)),
             side="buy",
             price=str(price),
             quantity=str(size),
@@ -136,7 +230,7 @@ class CixClient:
         """
         return self._post(
             "place_order",
-            team_identifier=str(team),
+            team_identifier=str(self.to_cix_name(team)),
             side="sell",
             price=str(price),
             quantity=str(size),

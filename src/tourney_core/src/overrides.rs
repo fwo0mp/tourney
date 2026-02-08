@@ -1,8 +1,5 @@
 use pyo3::prelude::*;
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::path::Path;
 
 /// Manual probability overrides for specific matchups.
 ///
@@ -22,41 +19,6 @@ impl OverridesMap {
         OverridesMap {
             overrides: HashMap::new(),
         }
-    }
-
-    /// Read overrides from a CSV file.
-    /// Format: team1,team2,probability
-    pub fn read_from_file(&mut self, filepath: &str) -> PyResult<()> {
-        let path = Path::new(filepath);
-        let file = File::open(path).map_err(|e| {
-            pyo3::exceptions::PyIOError::new_err(format!("Failed to open file: {}", e))
-        })?;
-        let reader = BufReader::new(file);
-
-        for line in reader.lines() {
-            let line = line.map_err(|e| {
-                pyo3::exceptions::PyIOError::new_err(format!("Failed to read line: {}", e))
-            })?;
-            let line = line.trim();
-            if line.is_empty() {
-                continue;
-            }
-
-            let parts: Vec<&str> = line.split(',').collect();
-            if parts.len() != 3 {
-                continue;
-            }
-
-            let name1 = parts[0].trim().to_string();
-            let name2 = parts[1].trim().to_string();
-            let prob: f64 = parts[2].trim().parse().map_err(|e| {
-                pyo3::exceptions::PyValueError::new_err(format!("Invalid probability: {}", e))
-            })?;
-
-            self.add_override(&name1, &name2, prob);
-        }
-
-        Ok(())
     }
 
     /// Add or update an override for a matchup.

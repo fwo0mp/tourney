@@ -2,7 +2,6 @@ import argparse
 from decimal import Decimal, ROUND_UP, ROUND_DOWN
 from dotenv import load_dotenv
 import os
-import re
 
 import cix_client
 import portfolio_value as pv
@@ -32,24 +31,6 @@ def get_spread(team, values, portfolio, base_margin=Decimal("0.05")):
     ask = base_ask.quantize(Decimal("0.01"), rounding=ROUND_UP)
 
     return bid, ask
-
-
-def canonicalize_name(name):
-    name_overrides = {
-        "Miami FL": "Miami (FL)",
-        "Texas A&M Corpus Chris": "Texas A&M Corpus Christi",
-        "Cal St. Fullerton": "CSU Fullerton",
-    }
-
-    try:
-        return name_overrides[name]
-    except KeyError:
-        pass
-
-    name = re.sub("St\.$", "State", name)
-    name = re.sub("^Saint", "St.", name)
-
-    return name
 
 
 if __name__ == "__main__":
@@ -86,7 +67,7 @@ if __name__ == "__main__":
     overrides = tourney.OverridesMap()
     if args.overrides:
         for override_file in args.overrides:
-            overrides.read_from_file(override_file)
+            tourney.read_overrides_file(overrides, override_file)
     bracket = tourney.read_games_from_file(args.bracket_file, ratings, overrides)
 
     client = cix_client.CixClient(APID)
@@ -150,9 +131,8 @@ if __name__ == "__main__":
                 do_order = answer[0].lower() == "y"
             if do_order:
                 try:
-                    order_name = canonicalize_name(team)
                     client.make_market(
-                        order_name,
+                        team,
                         bid=bid,
                         bid_size=args.order_size,
                         ask=ask,

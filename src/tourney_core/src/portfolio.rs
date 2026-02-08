@@ -299,7 +299,7 @@ mod tests {
             [("D".to_string(), 1.0)].into_iter().collect(),
         ];
 
-        TournamentState::new(bracket, ratings, vec![1.0, 1.0], None, 0.0)
+        TournamentState::new(bracket, ratings, vec![1.0, 1.0], None, 0.0, None)
     }
 
     #[test]

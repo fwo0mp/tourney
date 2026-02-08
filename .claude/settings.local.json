@@ -23,7 +23,14 @@
       "Bash(npx eslint:*)",
       "Bash(git add:*)",
       "Bash(npx vite build:*)",
-      "Bash(uv add:*)"
+      "Bash(uv add:*)",
+      "WebSearch",
+      "WebFetch(domain:en.wikipedia.org)",
+      "WebFetch(domain:www.ncaa.com)",
+      "WebFetch(domain:www.cbssports.com)",
+      "WebFetch(domain:www.nbcsports.com)",
+      "Bash(git checkout:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
