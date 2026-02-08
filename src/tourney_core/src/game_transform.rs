@@ -29,9 +29,9 @@ pub fn game_transform_prob(
     let mut parent: HashMap<String, f64> = HashMap::new();
 
     for (name1, &win1) in child1.iter() {
-        let team1 = &teams[name1];
+        let team1 = teams.get(name1).unwrap_or_else(|| panic!("team not found in ratings: {name1}"));
         for (name2, &win2) in child2.iter() {
-            let team2 = &teams[name2];
+            let team2 = teams.get(name2).unwrap_or_else(|| panic!("team not found in ratings: {name2}"));
             let game_prob = win1 * win2;
             let p1 = calculate_win_prob(team1, team2, overrides, forfeit_prob);
 
@@ -97,8 +97,8 @@ pub fn game_transform_sim<R: Rng>(
     let name1 = resolve_game_to_winner(child1, rng);
     let name2 = resolve_game_to_winner(child2, rng);
 
-    let team1 = &teams[&name1];
-    let team2 = &teams[&name2];
+    let team1 = teams.get(&name1).unwrap_or_else(|| panic!("team not found in ratings: {name1}"));
+    let team2 = teams.get(&name2).unwrap_or_else(|| panic!("team not found in ratings: {name2}"));
 
     // Simulate forfeits
     let team1_forfeit = rng.gen::<f64>() < forfeit_prob;

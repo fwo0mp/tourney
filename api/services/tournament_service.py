@@ -54,7 +54,7 @@ class TournamentService:
         # Load overrides
         overrides = tourney.OverridesMap()
         if Path(self._overrides_file).exists():
-            overrides.read_from_file(self._overrides_file)
+            tourney.read_overrides_file(overrides, self._overrides_file)
 
         # Load bracket
         games = tourney.read_games_from_file(bracket_path, self.ratings, overrides)

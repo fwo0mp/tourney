@@ -225,25 +225,29 @@ class TestFileReading:
 
     def test_read_ratings_file(self, tmp_path):
         """Test reading ratings from file."""
+        import tourney_utils as tourney
+
         ratings_file = tmp_path / "ratings.txt"
         ratings_file.write_text("Duke|115.0|95.0|70.0\nUNC|110.0|100.0|68.0\n")
 
-        rust_ratings = tourney_core.read_ratings_file(str(ratings_file))
+        ratings = tourney.read_ratings_file(str(ratings_file))
 
-        assert "Duke" in rust_ratings
-        assert "UNC" in rust_ratings
+        assert "Duke" in ratings
+        assert "UNC" in ratings
         # Check adjustment was applied (115/104.6 - 1 ≈ 0.099)
-        assert abs(rust_ratings["Duke"].offense - (115.0 / 104.6 - 1)) < TOLERANCE
+        assert abs(ratings["Duke"].offense - (115.0 / 104.6 - 1)) < TOLERANCE
 
     def test_read_adjustments_file(self, tmp_path):
         """Test reading adjustments from file."""
+        import tourney_utils as tourney
+
         adj_file = tmp_path / "adjustments.txt"
         adj_file.write_text("Duke|+1.5\nUNC|-1.0\n")
 
-        rust_adj = tourney_core.read_adjustments_file(str(adj_file))
+        adj = tourney.read_adjustments_file(str(adj_file))
 
-        assert rust_adj["Duke"] == 1.5
-        assert rust_adj["UNC"] == -1.0
+        assert adj["Duke"] == 1.5
+        assert adj["UNC"] == -1.0
 
 
 if __name__ == "__main__":
