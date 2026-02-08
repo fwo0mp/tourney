@@ -132,17 +132,26 @@ def game_delta(positions, tournament, team1, team2):
 
     Returns (win_value, loss_value, team_deltas).
     """
-    # Convert positions to float
+    # Convert positions to float, separating out 'points' (cash)
+    cash = 0.0
     float_positions = {}
     for k, v in positions.items():
         if isinstance(v, Decimal):
-            float_positions[k] = float(v)
+            fv = float(v)
         else:
-            float_positions[k] = v
+            fv = v
+        if k == "points":
+            cash = fv
+        else:
+            float_positions[k] = fv
 
     win_value, loss_value, rust_deltas = _rust_game_delta(
         float_positions, tournament, team1, team2
     )
+
+    # Add cash back — it's constant regardless of game outcome
+    win_value += cash
+    loss_value += cash
 
     # Convert to named tuples with position lookups
     team_deltas = []

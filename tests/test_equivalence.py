@@ -250,5 +250,74 @@ class TestFileReading:
         assert adj["UNC"] == -1.0
 
 
+class TestPortfolioValue:
+    """Test portfolio value calculations."""
+
+    def _make_tournament(self):
+        """Create a simple 4-team tournament for testing."""
+        ratings = {
+            "A": rust_impl.Team("A", 0.05, -0.02, 68.0),
+            "B": rust_impl.Team("B", 0.03, 0.01, 70.0),
+            "C": rust_impl.Team("C", -0.02, 0.03, 66.0),
+            "D": rust_impl.Team("D", 0.0, 0.0, 67.7),
+        }
+        bracket = [
+            {"A": 1.0}, {"B": 1.0},
+            {"C": 1.0}, {"D": 1.0},
+        ]
+        return rust_impl.TournamentState(
+            bracket=bracket, ratings=ratings,
+            scoring=[1.0, 1.0],
+        )
+
+    def test_game_delta_with_points(self):
+        """game_delta should handle 'points' (cash) consistently with get_portfolio_value."""
+        import portfolio_value as pv
+
+        state = self._make_tournament()
+        positions = {"A": 10.0, "B": 5.0, "points": 500.0}
+
+        # Compute current value (includes cash)
+        current_scores = state.calculate_scores_prob()
+        current_value = pv.get_portfolio_value(positions, current_scores)
+
+        # Compute game delta
+        win_value, loss_value, _ = pv.game_delta(positions, state, "A", "B")
+
+        # win_value and loss_value should include cash, just like current_value
+        # So deltas should be reasonable (not offset by -500)
+        win_delta = win_value - current_value
+        loss_delta = loss_value - current_value
+
+        # If A wins, portfolio with long A position should benefit
+        assert win_delta > 0, f"Expected positive delta when A wins (long A), got {win_delta}"
+        # If B wins (A loses), portfolio should lose value
+        assert loss_delta < 0, f"Expected negative delta when A loses, got {loss_delta}"
+
+        # Verify the values include cash by checking they're > 500
+        assert win_value > 500, f"win_value should include cash of 500, got {win_value}"
+        assert loss_value > 500, f"loss_value should include cash of 500, got {loss_value}"
+
+    def test_game_delta_without_points(self):
+        """game_delta should work correctly without 'points' entry."""
+        import portfolio_value as pv
+
+        state = self._make_tournament()
+        positions = {"A": 10.0, "B": 5.0}
+
+        current_scores = state.calculate_scores_prob()
+        current_value = pv.get_portfolio_value(positions, current_scores)
+
+        win_value, loss_value, _ = pv.game_delta(positions, state, "A", "B")
+
+        win_delta = win_value - current_value
+        loss_delta = loss_value - current_value
+
+        # One should be positive, the other negative (with long A and B positions)
+        # Since we hold more A than B, A winning should benefit us more
+        assert win_delta > 0, f"Expected positive delta when A wins, got {win_delta}"
+        assert loss_delta < 0, f"Expected negative delta when A loses, got {loss_delta}"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

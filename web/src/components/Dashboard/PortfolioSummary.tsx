@@ -18,11 +18,25 @@ const CHART_MARGIN = { top: 20, right: 20, bottom: 30, left: 50 };
 function DistributionChart({ distribution }: { distribution: PortfolioSummaryType }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  // Track container width changes (e.g. sidebar open/close)
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(el);
+    setContainerWidth(el.clientWidth);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
-    if (!svgRef.current || !containerRef.current || !distribution.histogram.length) return;
+    if (!svgRef.current || !containerWidth || !distribution.histogram.length) return;
 
-    const containerWidth = containerRef.current.clientWidth;
     const width = containerWidth - CHART_MARGIN.left - CHART_MARGIN.right;
     const height = CHART_HEIGHT - CHART_MARGIN.top - CHART_MARGIN.bottom;
 
@@ -125,7 +139,7 @@ function DistributionChart({ distribution }: { distribution: PortfolioSummaryTyp
       .selectAll('text')
       .attr('font-size', '10px');
 
-  }, [distribution]);
+  }, [distribution, containerWidth]);
 
   return (
     <div ref={containerRef} className="w-full">
