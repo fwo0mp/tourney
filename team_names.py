@@ -5,78 +5,18 @@ Different data sources (ESPN, KenPom, CIX, betting odds API) use different
 names for the same school. This module provides a central registry of name
 equivalences and utilities to resolve names across sources.
 
-Each equivalence class is a set of strings that all refer to the same school.
-The first element listed is treated as the "canonical" name.
+Equivalence classes are defined in team_names.yaml. Each list groups all known
+names for one school; the first entry is the "canonical" name.
 """
 
+from pathlib import Path
 
-# fmt: off
-# Each tuple is an equivalence class. The first entry is the canonical name.
-# Populated from: get_data.py NAME_CONVERSIONS, portfolio_value.py CIX_NAME_CONVERSIONS,
-# make_markets.py canonicalize_name(), and CIX game_config full_name values.
-EQUIVALENCE_CLASSES = [
-    # Schools with many variant names across sources
-    ("NC State", "N.C. State", "North Carolina St.", "North Carolina State", "Nc St.", "NCST"),
-    ("UConn", "Connecticut", "Uconn"),
-    ("USC", "Southern California", "Southern Cal"),
-    ("VCU", "Virginia Commonwealth"),
-    ("FDU", "Fairleigh Dickinson", "Fdu"),
-    ("St. Mary's", "Saint Mary's", "St. Mary's (ca)"),
-    ("St. John's", "Saint John's"),
-    ("Texas A&M", "Texas Am", "Texas A&m;", "TAMU"),
-    ("Texas Southern", "Texas So."),
-    ("LSU", "Louisiana St.", "Louisiana State"),
-    ("TCU", "Texas Christian"),
-    ("BYU", "Brigham Young"),
-    ("Ole Miss", "Mississippi"),
-    ("Miami FL", "Miami", "Miami (FL)", "Miami (fl)"),
+import yaml
 
-    # "State" vs "St." variants
-    ("Michigan State", "Michigan St."),
-    ("Iowa State", "Iowa St."),
-    ("Florida State", "Florida St."),
-    ("Mississippi State", "Mississippi St."),
-    ("Oregon State", "Oregon St."),
-    ("Oklahoma State", "Oklahoma St."),
-    ("Kent State", "Kent St."),
-    ("Wichita State", "Wichita St."),
-    ("Utah State", "Utah St."),
-    ("Boise State", "Boise St."),
-    ("Colorado State", "Colorado St."),
-    ("Arizona State", "Arizona St."),
-    ("Ohio State", "Ohio St."),
-    ("San Diego State", "San Diego St."),
-    ("Georgia State", "Georgia St."),
-    ("Middle Tennessee", "Middle Tennessee St.", "Middle Tennessee State"),
-    ("SIU Edwardsville", "SIU-Edwardsville", "SIUE"),
-    ("Southeast Missouri St.", "Se Missourist."),
+_YAML_PATH = Path(__file__).parent / "team_names.yaml"
 
-    # Other abbreviation/spelling variants
-    ("UMBC", "Md-baltimore County"),
-    ("Penn", "Pennsylvania"),
-    ("UNC Greensboro", "Uncg"),
-    ("UC Santa Barbara", "UCSB"),
-    ("Eastern Washington", "E. Washington"),
-    ("Loyola Chicago", "Loyola-chicago", "Loyola (chi)"),
-    ("Cal St. Fullerton", "CSU Fullerton", "Cs Fullerton", "Csu Fullerton"),
-    ("Texas A&M Corpus Chris", "Texas A&m-cc", "Tamu-cc", "Texas A&M Corpus Christi"),
-    ("Southeastern Louisiana", "Se Louisiana"),
-    ("Arkansas Pine Bluff", "Arkansas-pine Bluff"),
-    ("Louisiana", "Louisiana Lafayette"),
-    ("Charleston", "College of Charleston"),
-    ("Buffalo", "Suny-buffalo"),
-    ("Gardner Webb", "Gardner-webb"),
-    ("Florida Atlantic", "Fla. Atlantic"),
-    ("Northern Kentucky", "No. Kentucky"),
-    ("Ohio", "Ohio University"),
-    ("UC Davis", "California Davis"),
-    ("Nevada", "Nevada Reno"),
-    ("Alabama", "Alabma"),  # historical typo in old data
-    ("Abilene Christian", "Abilene Chrsitian"),  # historical typo in old data
-    ("Mount St. Mary's", "Mt. St. Mary's"),
-    ("SMU", "Southern Methodist"),
-]
-# fmt: on
+with open(_YAML_PATH) as _f:
+    EQUIVALENCE_CLASSES = [tuple(entry) for entry in yaml.safe_load(_f)]
 
 
 def _build_lookup():
