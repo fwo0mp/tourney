@@ -80,6 +80,7 @@ export function ScenarioSelector({ compact = false }: ScenarioSelectorProps) {
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setIsOpen(!isOpen)}
+          data-testid="scenario-selector-toggle-compact"
           className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${
             whatIf.activeScenarioId
               ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
@@ -97,6 +98,7 @@ export function ScenarioSelector({ compact = false }: ScenarioSelectorProps) {
             <div className="py-1">
               <button
                 onClick={() => handleSelect(null)}
+                data-testid="scenario-option-default-compact"
                 className={`w-full px-3 py-1.5 text-left text-sm hover:bg-zinc-700 flex items-center justify-between ${
                   !whatIf.activeScenarioId ? 'text-blue-400' : 'text-zinc-300'
                 }`}
@@ -120,6 +122,7 @@ export function ScenarioSelector({ compact = false }: ScenarioSelectorProps) {
                 >
                   <button
                     onClick={() => handleSelect(scenario.id)}
+                    data-testid={`scenario-option-${scenario.id}-compact`}
                     className="flex-1 text-left text-sm truncate"
                   >
                     {scenario.name}
@@ -153,6 +156,7 @@ export function ScenarioSelector({ compact = false }: ScenarioSelectorProps) {
                   <input
                     ref={inputRef}
                     type="text"
+                    data-testid="scenario-create-input-compact"
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     onKeyDown={(e) => {
@@ -168,6 +172,7 @@ export function ScenarioSelector({ compact = false }: ScenarioSelectorProps) {
                   <div className="flex gap-1 mt-1">
                     <button
                       onClick={handleCreate}
+                      data-testid="scenario-create-confirm-compact"
                       disabled={!newName.trim()}
                       className="flex-1 px-2 py-0.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -187,6 +192,7 @@ export function ScenarioSelector({ compact = false }: ScenarioSelectorProps) {
               ) : (
                 <button
                   onClick={() => setIsCreating(true)}
+                  data-testid="scenario-create-button-compact"
                   className="w-full px-3 py-1.5 text-left text-sm text-blue-400 hover:bg-zinc-700 flex items-center gap-1"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -207,6 +213,7 @@ export function ScenarioSelector({ compact = false }: ScenarioSelectorProps) {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
+        data-testid="scenario-selector-toggle"
         className={`w-full px-3 py-2 text-sm rounded flex items-center justify-between ${
           whatIf.activeScenarioId
             ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
@@ -224,6 +231,7 @@ export function ScenarioSelector({ compact = false }: ScenarioSelectorProps) {
           <div className="py-1">
             <button
               onClick={() => handleSelect(null)}
+              data-testid="scenario-option-default"
               className={`w-full px-3 py-2 text-left text-sm hover:bg-zinc-700 flex items-center justify-between ${
                 !whatIf.activeScenarioId ? 'text-blue-400' : 'text-zinc-300'
               }`}
@@ -250,6 +258,7 @@ export function ScenarioSelector({ compact = false }: ScenarioSelectorProps) {
               >
                 <button
                   onClick={() => handleSelect(scenario.id)}
+                  data-testid={`scenario-option-${scenario.id}`}
                   className="flex-1 text-left"
                 >
                   <div className="text-sm font-medium truncate">{scenario.name}</div>
@@ -286,6 +295,7 @@ export function ScenarioSelector({ compact = false }: ScenarioSelectorProps) {
                 <input
                   ref={inputRef}
                   type="text"
+                  data-testid="scenario-create-input"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   onKeyDown={(e) => {
@@ -301,6 +311,7 @@ export function ScenarioSelector({ compact = false }: ScenarioSelectorProps) {
                 <div className="flex gap-2 mt-2">
                   <button
                     onClick={handleCreate}
+                    data-testid="scenario-create-confirm"
                     disabled={!newName.trim()}
                     className="flex-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -320,6 +331,7 @@ export function ScenarioSelector({ compact = false }: ScenarioSelectorProps) {
             ) : (
               <button
                 onClick={() => setIsCreating(true)}
+                data-testid="scenario-create-button"
                 className="w-full px-3 py-2 text-left text-sm text-blue-400 hover:bg-zinc-700 flex items-center gap-2"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

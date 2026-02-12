@@ -73,7 +73,7 @@ export function WhatIfTool() {
   const hasAnyOverrides = hasScenarioOverrides || hasPermanentOverrides;
 
   return (
-    <div className="bg-zinc-900 rounded-lg border border-zinc-800 p-4">
+    <div data-testid="whatif-tool" className="bg-zinc-900 rounded-lg border border-zinc-800 p-4">
       {/* Header with Scenario Selector */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-zinc-100">What-If Analysis</h2>
@@ -81,6 +81,7 @@ export function WhatIfTool() {
           {hasScenarioOverrides && (
             <button
               onClick={clearTemporaryOverrides}
+              data-testid="whatif-clear-temp"
               className="px-2 py-1 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-800 hover:bg-zinc-700 rounded"
               title="Clear scenario overrides"
             >
@@ -90,6 +91,7 @@ export function WhatIfTool() {
           {hasAnyOverrides && (
             <button
               onClick={clearWhatIf}
+              data-testid="whatif-clear-all"
               className="px-2 py-1 text-xs text-red-400 hover:text-red-300 bg-zinc-800 hover:bg-zinc-700 rounded"
               title="Clear all overrides"
             >
@@ -113,6 +115,7 @@ export function WhatIfTool() {
           ratingAdjustments={whatIf.permanentRatingAdjustments}
           isPermanent={true}
           emptyMessage="No permanent overrides"
+          sectionTestId="whatif-permanent-overrides"
         />
       </div>
 
@@ -125,6 +128,7 @@ export function WhatIfTool() {
           isPermanent={false}
           showPromote={true}
           emptyMessage={whatIf.activeScenarioId ? 'No scenario overrides' : 'No ad-hoc overrides'}
+          sectionTestId="whatif-scenario-overrides"
         />
       </div>
 
@@ -137,6 +141,7 @@ export function WhatIfTool() {
             <select
               value={team1}
               onChange={(e) => setTeam1(e.target.value)}
+              data-testid="whatif-winner-select"
               className="w-full mt-1 px-2 py-1.5 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-200"
             >
               <option value="">Select...</option>
@@ -151,6 +156,7 @@ export function WhatIfTool() {
             <select
               value={team2}
               onChange={(e) => setTeam2(e.target.value)}
+              data-testid="whatif-loser-select"
               className="w-full mt-1 px-2 py-1.5 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-200"
             >
               <option value="">Select...</option>
@@ -162,6 +168,7 @@ export function WhatIfTool() {
           <button
             onClick={handleAddOutcome}
             disabled={!team1 || !team2}
+            data-testid="whatif-add-outcome"
             className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-500"
           >
             Add
@@ -172,6 +179,7 @@ export function WhatIfTool() {
             type="checkbox"
             checked={isPermanentGame}
             onChange={(e) => setIsPermanentGame(e.target.checked)}
+            data-testid="whatif-permanent-game"
             className="rounded border-zinc-600 bg-zinc-900 text-purple-500 focus:ring-purple-500"
           />
           <span className={isPermanentGame ? 'text-purple-400' : ''}>Make permanent</span>
@@ -187,6 +195,7 @@ export function WhatIfTool() {
             <select
               value={adjustTeam}
               onChange={(e) => setAdjustTeam(e.target.value)}
+              data-testid="whatif-adjust-team-select"
               className="w-full mt-1 px-2 py-1.5 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-200"
             >
               <option value="">Select...</option>
@@ -201,6 +210,7 @@ export function WhatIfTool() {
               type="number"
               value={adjustValue}
               onChange={(e) => setAdjustValue(Number(e.target.value))}
+              data-testid="whatif-adjust-value-input"
               className="w-full mt-1 px-2 py-1.5 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-200"
               step="0.5"
             />
@@ -208,6 +218,7 @@ export function WhatIfTool() {
           <button
             onClick={handleAddAdjustment}
             disabled={!adjustTeam || adjustValue === 0}
+            data-testid="whatif-add-adjustment"
             className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-500"
           >
             Add
@@ -218,6 +229,7 @@ export function WhatIfTool() {
             type="checkbox"
             checked={isPermanentAdjust}
             onChange={(e) => setIsPermanentAdjust(e.target.checked)}
+            data-testid="whatif-permanent-adjust"
             className="rounded border-zinc-600 bg-zinc-900 text-purple-500 focus:ring-purple-500"
           />
           <span className={isPermanentAdjust ? 'text-purple-400' : ''}>Make permanent</span>
@@ -228,6 +240,7 @@ export function WhatIfTool() {
       <button
         onClick={handleAnalyze}
         disabled={!hasAnyOverrides}
+        data-testid="whatif-analyze-button"
         className="w-full py-2 bg-blue-600 text-white rounded font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-500"
       >
         {analysisMutation.isPending ? 'Analyzing...' : 'Analyze Scenario'}
@@ -235,7 +248,9 @@ export function WhatIfTool() {
 
       {/* Results */}
       {analysisMutation.data && (
-        <WhatIfResults data={analysisMutation.data} />
+        <div data-testid="whatif-results">
+          <WhatIfResults data={analysisMutation.data} />
+        </div>
       )}
 
       {analysisMutation.isError && (

@@ -20,6 +20,7 @@ export function Dashboard() {
       <div className="flex gap-2">
         <button
           onClick={() => setViewMode('overview')}
+          data-testid="dashboard-tab-teams"
           className={`px-4 py-2 text-sm font-medium rounded-lg ${
             viewMode === 'overview'
               ? 'bg-blue-600 text-white'
@@ -30,6 +31,7 @@ export function Dashboard() {
         </button>
         <button
           onClick={() => setViewMode('bracket')}
+          data-testid="dashboard-tab-bracket"
           className={`px-4 py-2 text-sm font-medium rounded-lg ${
             viewMode === 'bracket'
               ? 'bg-blue-600 text-white'
@@ -40,6 +42,7 @@ export function Dashboard() {
         </button>
         <button
           onClick={() => setViewMode('whatif')}
+          data-testid="dashboard-tab-whatif"
           className={`px-4 py-2 text-sm font-medium rounded-lg ${
             viewMode === 'whatif'
               ? 'bg-blue-600 text-white'
@@ -50,6 +53,7 @@ export function Dashboard() {
         </button>
         <button
           onClick={() => setViewMode('completed')}
+          data-testid="dashboard-tab-completed"
           className={`px-4 py-2 text-sm font-medium rounded-lg ${
             viewMode === 'completed'
               ? 'bg-blue-600 text-white'
@@ -60,6 +64,7 @@ export function Dashboard() {
         </button>
         <button
           onClick={() => setViewMode('teamdetail')}
+          data-testid="dashboard-tab-teamdetail"
           className={`px-4 py-2 text-sm font-medium rounded-lg ${
             viewMode === 'teamdetail'
               ? 'bg-blue-600 text-white'
