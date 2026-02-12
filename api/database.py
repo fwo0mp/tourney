@@ -201,6 +201,14 @@ def get_active_scenario() -> Optional[dict]:
 def set_active_scenario(scenario_id: Optional[int]) -> bool:
     """Set the active scenario. Pass None for default (no scenario)."""
     with get_connection() as conn:
+        if scenario_id is not None:
+            exists = conn.execute(
+                "SELECT 1 FROM scenarios WHERE id = ?",
+                (scenario_id,),
+            ).fetchone()
+            if not exists:
+                return False
+
         conn.execute(
             "UPDATE active_scenario SET scenario_id = ? WHERE id = 1",
             (scenario_id,)

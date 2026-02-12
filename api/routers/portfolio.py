@@ -11,7 +11,7 @@ from api.models import (
     HypotheticalValueResponse,
 )
 from api.services.portfolio_service import PortfolioService, get_portfolio_service
-from api.services.tournament_service import TournamentService, get_tournament_service, apply_what_if
+from api.services.tournament_service import TournamentService, get_tournament_service
 from api.utils import parse_what_if_params
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
@@ -43,9 +43,10 @@ def get_value(
         outcomes, adjustments = parse_what_if_params(what_if_outcomes, what_if_adjustments)
 
         # Get tournament state, optionally with what-if modifications
-        state = tournament.get_state()
-        if outcomes or adjustments:
-            state = apply_what_if(state, game_outcomes=outcomes, rating_adjustments=adjustments)
+        state = tournament.get_effective_state(
+            game_outcomes=outcomes,
+            rating_adjustments=adjustments,
+        )
 
         # Calculate expected value (cheap probabilistic calculation)
         positions, _ = portfolio.get_positions()
@@ -79,9 +80,10 @@ def get_distribution(
         outcomes, adjustments = parse_what_if_params(what_if_outcomes, what_if_adjustments)
 
         # Get tournament state, optionally with what-if modifications
-        state = tournament.get_state()
-        if outcomes or adjustments:
-            state = apply_what_if(state, game_outcomes=outcomes, rating_adjustments=adjustments)
+        state = tournament.get_effective_state(
+            game_outcomes=outcomes,
+            rating_adjustments=adjustments,
+        )
 
         dist = portfolio.get_portfolio_distribution(n_simulations, seed, state=state)
         return PortfolioSummary(**dist)
@@ -160,9 +162,10 @@ def get_hypothetical_value(
         outcomes, adjustments = parse_what_if_params(what_if_outcomes, what_if_adjustments)
 
         # Get tournament state with any what-if modifications
-        state = tournament.get_state()
-        if outcomes or adjustments:
-            state = apply_what_if(state, game_outcomes=outcomes, rating_adjustments=adjustments)
+        state = tournament.get_effective_state(
+            game_outcomes=outcomes,
+            rating_adjustments=adjustments,
+        )
 
         # Get current positions and cash balance
         positions, _ = portfolio.get_positions()
