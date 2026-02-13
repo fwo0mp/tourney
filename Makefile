@@ -53,7 +53,7 @@ find-port:
 # Install Playwright tooling and browser runtime
 e2e-install:
 	cd web && npm install
-	cd web && npx -y @playwright/test@1.53.2 install chromium
+	cd web && npx playwright install chromium
 
 # Create/refresh the canonical E2E DB snapshot
 e2e-snapshot:

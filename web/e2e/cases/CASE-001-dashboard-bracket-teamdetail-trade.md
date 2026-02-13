@@ -47,7 +47,7 @@
         { "type": "click", "target": { "by": "testId", "value": "dashboard-tab-teamdetail" } },
         { "type": "expectVisible", "target": { "by": "testId", "value": "teamdetail-team-select" } },
         { "type": "select", "target": { "by": "testId", "value": "teamdetail-team-select" }, "optionValue": "Duke" },
-        { "type": "expectVisible", "target": { "by": "text", "value": "Hypothetical Trade" } }
+        { "type": "expectVisible", "target": { "by": "role", "role": "heading", "name": "Hypothetical Trade" } }
       ]
     },
     {

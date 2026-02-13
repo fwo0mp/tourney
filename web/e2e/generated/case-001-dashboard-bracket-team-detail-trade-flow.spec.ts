@@ -24,7 +24,7 @@ test("CASE-001: Dashboard bracket team detail trade flow", async ({ page }) => {
   await page.getByTestId("dashboard-tab-teamdetail").click();
   await expect(page.getByTestId("teamdetail-team-select")).toBeVisible();
   await page.getByTestId("teamdetail-team-select").selectOption("Duke");
-  await expect(page.getByText("Hypothetical Trade")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Hypothetical Trade" })).toBeVisible();
 
   // CASE-001 Step-4: Set buy quantity and price for hypothetical trade
   // Expected: Impact cards are visible for position, EV change, and net impact.

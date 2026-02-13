@@ -20,7 +20,7 @@ export const test = base.extend<E2EFixtures>({
   ],
 
   page: async ({ page, isolatedApiBaseUrl }, use) => {
-    await page.route('**/api/**', async (route) => {
+    await page.route('**/api/v1/**', async (route) => {
       const request = route.request();
       const currentUrl = new URL(request.url());
       const targetUrl = `${isolatedApiBaseUrl}${currentUrl.pathname}${currentUrl.search}`;
