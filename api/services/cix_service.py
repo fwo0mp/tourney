@@ -3,6 +3,26 @@
 import os
 from typing import Optional
 
+import requests
+
+from cix_client.exceptions import ApiException, BracketMismatchError
+
+
+class CIXServiceError(RuntimeError):
+    """Base class for CIX service failures."""
+
+
+class CIXConfigurationError(CIXServiceError):
+    """Raised when CIX service is misconfigured."""
+
+
+class CIXUnavailableError(CIXServiceError):
+    """Raised when CIX cannot be reached."""
+
+
+class CIXUpstreamError(CIXServiceError):
+    """Raised when CIX returns an application error."""
+
 
 class CIXService:
     """Service for CIX market operations."""
@@ -30,7 +50,7 @@ class CIXService:
             from api.services.tournament_service import get_tournament_service
             apid = os.getenv("CIX_APID")
             if not apid:
-                raise RuntimeError(
+                raise CIXConfigurationError(
                     "CIX_APID environment variable is not set. "
                     "Set CIX_APID to connect to CIX, or set USE_MOCK_DATA=true for development."
                 )
@@ -41,6 +61,17 @@ class CIXService:
                 client.set_bracket_teams(bracket_teams)
             self._client = client
         return self._client
+
+    @staticmethod
+    def _translate_client_error(exc: Exception, operation: str) -> CIXServiceError:
+        """Map lower-level client/network failures to typed service errors."""
+        if isinstance(exc, (ApiException, BracketMismatchError)):
+            return CIXUpstreamError(f"CIX {operation} failed: {exc}")
+        if isinstance(exc, requests.RequestException):
+            return CIXUnavailableError(f"CIX {operation} request failed: {exc}")
+        if isinstance(exc, CIXServiceError):
+            return exc
+        return CIXUpstreamError(f"CIX {operation} failed: {exc}")
 
     def get_orderbook(self, team: str) -> dict:
         """Get current orderbook for a team."""
@@ -58,14 +89,17 @@ class CIXService:
                 "is_mock": True,
             }
 
-        client = self._get_client()
-        orderbook = client.get_orderbook(team)
-        return {
-            "team": team,
-            "bids": orderbook.get("bids", []),
-            "asks": orderbook.get("asks", []),
-            "is_mock": False,
-        }
+        try:
+            client = self._get_client()
+            orderbook = client.get_orderbook(team)
+            return {
+                "team": team,
+                "bids": orderbook.get("bids", []),
+                "asks": orderbook.get("asks", []),
+                "is_mock": False,
+            }
+        except Exception as exc:
+            raise self._translate_client_error(exc, "get_orderbook") from exc
 
     def place_order(self, team: str, side: str, price: float, size: int) -> dict:
         """Place an order."""
@@ -80,32 +114,40 @@ class CIXService:
                 "is_mock": True,
             }
 
-        client = self._get_client()
-        if side == "buy":
-            result = client.place_bid(team, price, size)
-        elif side == "sell":
-            result = client.place_ask(team, price, size)
-        else:
-            raise ValueError(f"Invalid side: {side}")
+        try:
+            client = self._get_client()
+            if side == "buy":
+                result = client.place_bid(team, price, size)
+            elif side == "sell":
+                result = client.place_ask(team, price, size)
+            else:
+                raise ValueError(f"Invalid side: {side}")
 
-        return {
-            "success": True,
-            "order_id": result.get("order_id"),
-            "team": team,
-            "side": side,
-            "price": price,
-            "size": size,
-            "is_mock": False,
-        }
+            return {
+                "success": True,
+                "order_id": result.get("order_id"),
+                "team": team,
+                "side": side,
+                "price": price,
+                "size": size,
+                "is_mock": False,
+            }
+        except ValueError:
+            raise
+        except Exception as exc:
+            raise self._translate_client_error(exc, "place_order") from exc
 
     def cancel_order(self, order_id: str) -> dict:
         """Cancel an order."""
         if self._use_mock:
             return {"success": True, "order_id": order_id, "is_mock": True}
 
-        client = self._get_client()
-        client.cancel_order(order_id)
-        return {"success": True, "order_id": order_id, "is_mock": False}
+        try:
+            client = self._get_client()
+            client.cancel_order(order_id)
+            return {"success": True, "order_id": order_id, "is_mock": False}
+        except Exception as exc:
+            raise self._translate_client_error(exc, "cancel_order") from exc
 
 
 def get_cix_service() -> CIXService:

@@ -3,7 +3,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from api.services.cix_service import CIXService, get_cix_service
+from api.services.cix_service import (
+    CIXService,
+    CIXConfigurationError,
+    CIXUnavailableError,
+    CIXUpstreamError,
+    get_cix_service,
+)
 
 router = APIRouter(prefix="/market", tags=["market"])
 
@@ -48,14 +54,21 @@ def get_orderbook(
     cix: CIXService = Depends(get_cix_service),
 ):
     """Get current orderbook for a team."""
-    result = cix.get_orderbook(team)
-    return OrderbookResponse(
-        team=result["team"],
-        bids=[OrderbookLevel(**b) for b in result.get("bids", [])],
-        asks=[OrderbookLevel(**a) for a in result.get("asks", [])],
-        is_mock=result.get("is_mock", True),
-        error=result.get("error"),
-    )
+    try:
+        result = cix.get_orderbook(team)
+        return OrderbookResponse(
+            team=result["team"],
+            bids=[OrderbookLevel(**b) for b in result.get("bids", [])],
+            asks=[OrderbookLevel(**a) for a in result.get("asks", [])],
+            is_mock=result.get("is_mock", True),
+            error=result.get("error"),
+        )
+    except CIXConfigurationError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except CIXUnavailableError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except CIXUpstreamError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 
 @router.post("/{team}/order", response_model=OrderResponse)
@@ -74,13 +87,20 @@ def place_order(
     if order.size <= 0:
         raise HTTPException(status_code=400, detail="Size must be positive")
 
-    result = cix.place_order(team, order.side, order.price, order.size)
-    return OrderResponse(
-        success=result["success"],
-        order_id=result.get("order_id"),
-        error=result.get("error"),
-        is_mock=result.get("is_mock", True),
-    )
+    try:
+        result = cix.place_order(team, order.side, order.price, order.size)
+        return OrderResponse(
+            success=result["success"],
+            order_id=result.get("order_id"),
+            error=result.get("error"),
+            is_mock=result.get("is_mock", True),
+        )
+    except CIXConfigurationError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except CIXUnavailableError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except CIXUpstreamError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 
 @router.delete("/orders/{order_id}")
@@ -89,5 +109,12 @@ def cancel_order(
     cix: CIXService = Depends(get_cix_service),
 ):
     """Cancel an existing order."""
-    result = cix.cancel_order(order_id)
-    return result
+    try:
+        result = cix.cancel_order(order_id)
+        return result
+    except CIXConfigurationError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except CIXUnavailableError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except CIXUpstreamError as e:
+        raise HTTPException(status_code=502, detail=str(e))
