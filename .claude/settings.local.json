@@ -30,7 +30,8 @@
       "WebFetch(domain:www.cbssports.com)",
       "WebFetch(domain:www.nbcsports.com)",
       "Bash(git checkout:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(xargs ls:*)"
     ]
   }
 }

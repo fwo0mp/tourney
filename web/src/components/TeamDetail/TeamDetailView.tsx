@@ -1,8 +1,11 @@
 import { useMemo } from 'react';
 import { useTeams, useTeam, useScoringConfig } from '../../hooks/useTournament';
 import { useTeamImpact, usePositions, useDeltas, useHypotheticalPortfolio } from '../../hooks/usePortfolio';
+import { useOrderbook } from '../../hooks/useMarket';
 import { useUIStore } from '../../store/uiStore';
 import { SortHeader, useSortState, sortData } from '../common';
+import { OrderBook } from './OrderBook';
+import { MarketMakerControls } from './MarketMakerControls';
 
 type DeltaRiskSortColumn = 'team' | 'currentDelta' | 'deltaChange' | 'newDelta';
 
@@ -20,6 +23,7 @@ export function TeamDetailView() {
   const { data: positions } = usePositions();
   const { data: deltas } = useDeltas();
   const { data: scoringConfig } = useScoringConfig();
+  const { data: orderbook } = useOrderbook(detailedViewTeam);
 
   // Sort state for the delta risk table
   const {
@@ -199,6 +203,32 @@ export function TeamDetailView() {
                 </div>
               </div>
 
+              {/* Top Bid / Ask from orderbook */}
+              {orderbook && (orderbook.bids.length > 0 || orderbook.asks.length > 0) && (
+                <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <span className="text-sm text-gray-500">Bid: </span>
+                      <span className="text-sm font-bold text-green-700">
+                        {orderbook.bids.length > 0 ? orderbook.bids[0].price.toFixed(2) : '-'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-sm text-gray-500">Ask: </span>
+                      <span className="text-sm font-bold text-red-700">
+                        {orderbook.asks.length > 0 ? orderbook.asks[0].price.toFixed(2) : '-'}
+                      </span>
+                    </div>
+                    {orderbook.bids.length > 0 && orderbook.asks.length > 0 && (
+                      <div className="text-xs text-gray-500">
+                        Spread: {(orderbook.asks[0].price - orderbook.bids[0].price).toFixed(2)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">Top of Book</div>
+                </div>
+              )}
+
               <div className="bg-gray-50 rounded-lg p-4 mb-6">
                 <div className={`text-xl font-bold ${team.delta > 0 ? 'text-green-600' : team.delta < 0 ? 'text-red-600' : 'text-gray-400'}`}>
                   {team.delta > 0 ? '+' : ''}{team.delta.toFixed(2)}
@@ -337,6 +367,12 @@ export function TeamDetailView() {
                 Clear Trade
               </button>
             </div>
+          </div>
+
+          {/* Order Book + Market Maker Controls */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <OrderBook team={detailedViewTeam} />
+            <MarketMakerControls team={detailedViewTeam} fairValue={fairValue} maxPrice={maxPrice} />
           </div>
 
           {/* Portfolio Impact */}

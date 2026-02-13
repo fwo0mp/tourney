@@ -402,7 +402,7 @@ class TestBracketValidation:
         assert result == {"Connecticut": 10, "N.C. State": 5}
 
     def test_to_cix_name_after_validation(self):
-        """to_cix_name should translate bracket names to CIX server names."""
+        """to_cix_name should translate bracket names to CIX abbreviations."""
         game_config = {
             "game_name": "NCAA 2026",
             "game_type": "tournament",
@@ -420,7 +420,7 @@ class TestBracketValidation:
         with patch.object(client._session, "post", side_effect=fake_post):
             client._validate_bracket()
 
-        assert client.to_cix_name("Connecticut") == "UConn"
+        assert client.to_cix_name("Connecticut") == "CONN"
         # Unknown names pass through unchanged
         assert client.to_cix_name("Unknown Team") == "Unknown Team"
 
@@ -444,23 +444,24 @@ class TestBracketValidation:
             client._validate_bracket()
 
         assert client.from_cix_name("UConn") == "Connecticut"
+        assert client.from_cix_name("CONN") == "Connecticut"
         assert client.from_cix_name("Unknown Team") == "Unknown Team"
 
     def test_outgoing_methods_translate_names(self):
-        """Outgoing API methods should translate to CIX names."""
+        """Outgoing API methods should translate to CIX abbreviations."""
         client = self._make_client()
-        client._to_cix = {"Connecticut": "UConn"}
+        client._to_cix = {"Connecticut": "CONN"}
         client._bracket_validated = True
 
         with patch.object(client, "_post") as mock:
             client.get_orderbook("Connecticut")
-        mock.assert_called_once_with("get_book", team="UConn", depth="5")
+        mock.assert_called_once_with("get_book", team="CONN", depth="5")
 
         with patch.object(client, "_post") as mock:
             client.place_bid("Connecticut", 2.50, 100)
         mock.assert_called_once_with(
             "place_order",
-            team_identifier="UConn", side="buy",
+            team_identifier="CONN", side="buy",
             price="2.5", quantity="100",
         )
 
@@ -468,7 +469,7 @@ class TestBracketValidation:
             client.place_ask("Connecticut", 3.00, 50)
         mock.assert_called_once_with(
             "place_order",
-            team_identifier="UConn", side="sell",
+            team_identifier="CONN", side="sell",
             price="3.0", quantity="50",
         )
 
@@ -477,7 +478,7 @@ class TestBracketValidation:
                                bid_size=5000, ask=Decimal("2.60"), ask_size=5000)
         mock.assert_called_once_with(
             "make_market",
-            team="UConn", bid="2.50", bid_size="5000",
+            team="CONN", bid="2.50", bid_size="5000",
             ask="2.60", ask_size="5000",
         )
 

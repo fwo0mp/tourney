@@ -217,6 +217,53 @@ export interface ScoringConfig {
   num_rounds: number;
 }
 
+// Market data types
+
+export interface OrderbookLevel {
+  price: number;
+  size: number;
+  entry: string | null;
+}
+
+export interface OrderbookResponse {
+  team: string;
+  bids: OrderbookLevel[];
+  asks: OrderbookLevel[];
+  is_mock: boolean;
+  error: string | null;
+}
+
+export interface MakeMarketRequest {
+  bid: number;
+  bid_size: number;
+  ask: number;
+  ask_size: number;
+}
+
+export interface MakeMarketResponse {
+  success: boolean;
+  team: string;
+  bid: number;
+  bid_size: number;
+  ask: number;
+  ask_size: number;
+  is_mock: boolean;
+  error: string | null;
+}
+
+export interface MyMarketEntry {
+  bid: number | null;
+  bid_size: number | null;
+  ask: number | null;
+  ask_size: number | null;
+  position: number | null;
+}
+
+export interface MyMarketsResponse {
+  markets: Record<string, MyMarketEntry>;
+  is_mock: boolean;
+}
+
 // Tree-based bracket types
 
 /**
