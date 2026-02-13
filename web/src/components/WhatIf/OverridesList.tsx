@@ -8,6 +8,7 @@ interface OverridesListProps {
   isPermanent: boolean;
   showPromote?: boolean;
   emptyMessage?: string;
+  sectionTestId?: string;
 }
 
 export function OverridesList({
@@ -17,6 +18,7 @@ export function OverridesList({
   isPermanent,
   showPromote = false,
   emptyMessage = 'No overrides',
+  sectionTestId,
 }: OverridesListProps) {
   const removeGameOutcome = useUIStore((s) => s.removeGameOutcome);
   const removeRatingAdjustment = useUIStore((s) => s.removeRatingAdjustment);
@@ -48,7 +50,7 @@ export function OverridesList({
   };
 
   return (
-    <div className="bg-zinc-800/50 rounded-lg p-3">
+    <div data-testid={sectionTestId} className="bg-zinc-800/50 rounded-lg p-3">
       <h4 className={`text-sm font-medium mb-2 ${isPermanent ? 'text-purple-400' : 'text-blue-400'}`}>
         {title}
       </h4>

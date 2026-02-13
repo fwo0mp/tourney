@@ -12,6 +12,8 @@ export function CompletedGamesView() {
   const [loser, setLoser] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  const testIdSafe = (value: string) => value.replace(/[^a-zA-Z0-9]+/g, '-');
+
   // Get eliminated teams for filtering
   const eliminatedTeams = new Set(completedGames?.map((g) => g.loser) || []);
 
@@ -48,7 +50,7 @@ export function CompletedGamesView() {
 
   if (gamesLoading || teamsLoading) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
+      <div data-testid="completed-games-view-loading" className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Completed Games</h2>
         <div className="animate-pulse space-y-4">
           <div className="h-10 bg-gray-200 rounded"></div>
@@ -60,13 +62,13 @@ export function CompletedGamesView() {
   }
 
   return (
-    <div className="space-y-6">
+    <div data-testid="completed-games-view" className="space-y-6">
       {/* Add new completed game */}
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Record Game Result</h2>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+          <div data-testid="completed-games-error" className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
             {error}
           </div>
         )}
@@ -77,6 +79,7 @@ export function CompletedGamesView() {
             <select
               value={winner}
               onChange={(e) => setWinner(e.target.value)}
+              data-testid="completed-winner-select"
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select winner...</option>
@@ -95,6 +98,7 @@ export function CompletedGamesView() {
             <select
               value={loser}
               onChange={(e) => setLoser(e.target.value)}
+              data-testid="completed-loser-select"
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select loser...</option>
@@ -112,6 +116,7 @@ export function CompletedGamesView() {
           <button
             onClick={handleAddGame}
             disabled={addGameMutation.isPending || !winner || !loser}
+            data-testid="completed-record-button"
             className="px-4 py-2 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {addGameMutation.isPending ? 'Adding...' : 'Record Result'}
@@ -129,7 +134,7 @@ export function CompletedGamesView() {
           <p className="text-gray-500 text-sm">No games have been recorded yet.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full">
+            <table data-testid="completed-games-table" className="min-w-full">
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="py-2 text-left text-xs font-medium text-gray-500 uppercase">
@@ -145,13 +150,18 @@ export function CompletedGamesView() {
               </thead>
               <tbody>
                 {completedGames?.map((game) => (
-                  <tr key={`${game.winner}-${game.loser}`} className="border-b border-gray-100">
+                  <tr
+                    key={`${game.winner}-${game.loser}`}
+                    data-testid={`completed-game-row-${testIdSafe(game.winner)}-${testIdSafe(game.loser)}`}
+                    className="border-b border-gray-100"
+                  >
                     <td className="py-3 text-sm font-medium text-green-700">{game.winner}</td>
                     <td className="py-3 text-sm text-gray-400 line-through">{game.loser}</td>
                     <td className="py-3 text-right">
                       <button
                         onClick={() => handleRemoveGame(game)}
                         disabled={removeGameMutation.isPending}
+                        data-testid={`completed-remove-${testIdSafe(game.winner)}-${testIdSafe(game.loser)}`}
                         className="text-sm text-red-600 hover:text-red-800 disabled:opacity-50"
                       >
                         Remove
