@@ -1,10 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useMyMarkets, useMakeMarket } from '../../hooks/useMarket';
+import type { MarketMakerQuoteState } from '../../types';
 
 interface MarketMakerControlsProps {
   team: string;
   fairValue: number;
   maxPrice: number;
+  onQuoteChange?: (quote: MarketMakerQuoteState) => void;
 }
 
 function roundDown(value: number, decimals: number): number {
@@ -29,8 +31,30 @@ function deriveFromBidAsk(bid: number, ask: number) {
   return { midpoint, spreadPct };
 }
 
-export function MarketMakerControls({ team, fairValue, maxPrice }: MarketMakerControlsProps) {
-  const { data: myMarkets } = useMyMarkets();
+function midpointFromBidAtSpread(bid: number, spreadPct: number) {
+  const factor = 1 - spreadPct / 200;
+  if (factor <= 0) return bid;
+  // Pick midpoint in the middle of the rounding interval so derived bid stays stable.
+  const bidCents = Math.round(bid * 100);
+  return (bidCents + 0.5) / (factor * 100);
+}
+
+function midpointFromAskAtSpread(ask: number, spreadPct: number) {
+  const factor = 1 + spreadPct / 200;
+  if (factor <= 0) return ask;
+  // Pick midpoint in the middle of the rounding interval so derived ask stays stable.
+  const askCents = Math.round(ask * 100);
+  return (askCents - 0.5) / (factor * 100);
+}
+
+function hasLiveSide(price: number | null | undefined, size: number | null | undefined) {
+  if (price == null || price <= 0) return false;
+  if (size == null) return true;
+  return size > 0;
+}
+
+export function MarketMakerControls({ team, fairValue, maxPrice, onQuoteChange }: MarketMakerControlsProps) {
+  const { data: myMarkets, isLoading: myMarketsLoading } = useMyMarkets();
   const makeMarket = useMakeMarket();
 
   const [midpoint, setMidpoint] = useState(fairValue);
@@ -41,12 +65,27 @@ export function MarketMakerControls({ team, fairValue, maxPrice }: MarketMakerCo
   const [askSize, setAskSize] = useState(5000);
   const [initialized, setInitialized] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const isValid = bid > 0 && ask > 0 && bid < ask && bidSize > 0 && askSize > 0;
 
-  // Pre-populate from existing orders when myMarkets loads
+  // Initial quote config:
+  // 1) Use existing live bid/ask if present.
+  // 2) If only one live side exists, keep that side and solve midpoint at 5% spread.
+  // 3) Otherwise use fair value midpoint with 5% spread.
   useEffect(() => {
-    if (initialized || !myMarkets) return;
-    const existing = myMarkets.markets[team];
-    if (existing && existing.bid != null && existing.ask != null) {
+    if (initialized || myMarketsLoading) return;
+    const existing = myMarkets?.markets[team];
+    const hasLiveBid = hasLiveSide(existing?.bid, existing?.bid_size);
+    const hasLiveAsk = hasLiveSide(existing?.ask, existing?.ask_size);
+    const defaultSpreadPct = 5;
+
+    if (
+      existing &&
+      hasLiveBid &&
+      hasLiveAsk &&
+      existing.bid != null &&
+      existing.ask != null &&
+      existing.bid < existing.ask
+    ) {
       const b = existing.bid;
       const a = existing.ask;
       setBid(b);
@@ -56,22 +95,53 @@ export function MarketMakerControls({ team, fairValue, maxPrice }: MarketMakerCo
       const derived = deriveFromBidAsk(b, a);
       setMidpoint(derived.midpoint);
       setSpreadPct(derived.spreadPct);
+    } else if (existing && hasLiveBid && existing.bid != null) {
+      const midpointFromBid = midpointFromBidAtSpread(existing.bid, defaultSpreadPct);
+      const derived = deriveFromMidSpread(midpointFromBid, defaultSpreadPct);
+      setMidpoint(midpointFromBid);
+      setSpreadPct(defaultSpreadPct);
+      setBid(existing.bid);
+      setAsk(derived.ask);
+      setBidSize(existing.bid_size ?? 5000);
+      setAskSize(hasLiveAsk ? (existing.ask_size ?? 5000) : 5000);
+    } else if (existing && hasLiveAsk && existing.ask != null) {
+      const midpointFromAsk = midpointFromAskAtSpread(existing.ask, defaultSpreadPct);
+      const derived = deriveFromMidSpread(midpointFromAsk, defaultSpreadPct);
+      setMidpoint(midpointFromAsk);
+      setSpreadPct(defaultSpreadPct);
+      setBid(derived.bid);
+      setAsk(existing.ask);
+      setBidSize(hasLiveBid ? (existing.bid_size ?? 5000) : 5000);
+      setAskSize(existing.ask_size ?? 5000);
     } else {
-      // Use defaults
-      const derived = deriveFromMidSpread(fairValue, 5);
+      // Use defaults (fair value midpoint, 5% spread).
+      const derived = deriveFromMidSpread(fairValue, defaultSpreadPct);
       setMidpoint(fairValue);
-      setSpreadPct(5);
+      setSpreadPct(defaultSpreadPct);
       setBid(derived.bid);
       setAsk(derived.ask);
+      setBidSize(5000);
+      setAskSize(5000);
     }
     setInitialized(true);
-  }, [myMarkets, team, fairValue, initialized]);
+  }, [myMarkets, myMarketsLoading, team, fairValue, initialized]);
 
-  // Reset when team changes
+  // Reset initialization state when team changes.
   useEffect(() => {
     setInitialized(false);
     setFeedback(null);
   }, [team]);
+
+  // Publish editable quote state for downstream scenario analysis.
+  useEffect(() => {
+    onQuoteChange?.({
+      bid,
+      ask,
+      bidSize,
+      askSize,
+      isValid,
+    });
+  }, [bid, ask, bidSize, askSize, isValid, onQuoteChange]);
 
   const handleMidpointChange = useCallback((value: number) => {
     setMidpoint(value);
@@ -116,8 +186,8 @@ export function MarketMakerControls({ team, fairValue, maxPrice }: MarketMakerCo
     );
   }, [team, bid, bidSize, ask, askSize, makeMarket]);
 
-  const isValid = bid > 0 && ask > 0 && bid < ask && bidSize > 0 && askSize > 0;
-  const hasExisting = myMarkets?.markets[team]?.bid != null;
+  const existing = myMarkets?.markets[team];
+  const hasExisting = hasLiveSide(existing?.bid, existing?.bid_size) || hasLiveSide(existing?.ask, existing?.ask_size);
 
   return (
     <div className="bg-white rounded-lg shadow p-6">

@@ -182,14 +182,6 @@ export interface Scenario {
 // View modes for Dashboard tabs
 export type ViewMode = 'overview' | 'bracket' | 'whatif' | 'completed' | 'teamdetail';
 
-// Hypothetical trade for exploring potential trades
-export interface HypotheticalTrade {
-  team: string;
-  direction: 'buy' | 'sell';
-  quantity: number;
-  price: number;
-}
-
 // Response from hypothetical value calculation
 export interface HypotheticalValueResponse {
   current_value: number;
@@ -262,6 +254,15 @@ export interface MyMarketEntry {
 export interface MyMarketsResponse {
   markets: Record<string, MyMarketEntry>;
   is_mock: boolean;
+}
+
+// Editable market-maker quote state used by Team Detail UI
+export interface MarketMakerQuoteState {
+  bid: number;
+  ask: number;
+  bidSize: number;
+  askSize: number;
+  isValid: boolean;
 }
 
 // Tree-based bracket types

@@ -1,25 +1,53 @@
-import { useOrderbook } from '../../hooks/useMarket';
+import { useOrderbook, useMyMarkets } from '../../hooks/useMarket';
 import type { OrderbookLevel } from '../../types';
 
 interface OrderBookProps {
   team: string;
 }
 
-function LevelRow({ level, side }: { level: OrderbookLevel; side: 'bid' | 'ask' }) {
+function samePrice(a: number, b: number): boolean {
+  return Math.abs(a - b) < 0.005;
+}
+
+function LevelRow({
+  level,
+  side,
+  isMine,
+}: {
+  level: OrderbookLevel;
+  side: 'bid' | 'ask';
+  isMine: boolean;
+}) {
   const isBid = side === 'bid';
+  const mineRowClass = isBid
+    ? 'bg-green-50 border-green-100'
+    : 'bg-red-50 border-red-100';
+
   return (
-    <tr className="border-b border-gray-50">
+    <tr className={`border-b ${isMine ? mineRowClass : 'border-gray-50'}`}>
       {isBid ? (
         <>
-          <td className="py-1.5 px-2 text-xs text-gray-500 text-left">{level.entry ?? ''}</td>
-          <td className="py-1.5 px-2 text-xs text-right text-gray-700">{level.size.toLocaleString()}</td>
-          <td className="py-1.5 px-2 text-sm text-right font-medium text-green-700">{level.price.toFixed(2)}</td>
+          <td className={`py-1.5 px-2 text-xs text-left ${isMine ? 'text-green-700 font-semibold' : 'text-gray-500'}`}>
+            {level.entry ?? (isMine ? 'you' : '')}
+          </td>
+          <td className={`py-1.5 px-2 text-xs text-right ${isMine ? 'text-green-800 font-semibold' : 'text-gray-700'}`}>
+            {level.size.toLocaleString()}
+          </td>
+          <td className={`py-1.5 px-2 text-sm text-right font-medium ${isMine ? 'text-green-800' : 'text-green-700'}`}>
+            {level.price.toFixed(2)}
+          </td>
         </>
       ) : (
         <>
-          <td className="py-1.5 px-2 text-sm text-left font-medium text-red-700">{level.price.toFixed(2)}</td>
-          <td className="py-1.5 px-2 text-xs text-left text-gray-700">{level.size.toLocaleString()}</td>
-          <td className="py-1.5 px-2 text-xs text-right text-gray-500">{level.entry ?? ''}</td>
+          <td className={`py-1.5 px-2 text-sm text-left font-medium ${isMine ? 'text-red-800' : 'text-red-700'}`}>
+            {level.price.toFixed(2)}
+          </td>
+          <td className={`py-1.5 px-2 text-xs text-left ${isMine ? 'text-red-800 font-semibold' : 'text-gray-700'}`}>
+            {level.size.toLocaleString()}
+          </td>
+          <td className={`py-1.5 px-2 text-xs text-right ${isMine ? 'text-red-700 font-semibold' : 'text-gray-500'}`}>
+            {level.entry ?? (isMine ? 'you' : '')}
+          </td>
         </>
       )}
     </tr>
@@ -28,6 +56,7 @@ function LevelRow({ level, side }: { level: OrderbookLevel; side: 'bid' | 'ask' 
 
 export function OrderBook({ team }: OrderBookProps) {
   const { data: orderbook, isLoading, error } = useOrderbook(team);
+  const { data: myMarkets } = useMyMarkets();
 
   if (isLoading) {
     return (
@@ -62,6 +91,21 @@ export function OrderBook({ team }: OrderBookProps) {
   const bidRows = bids.slice(0, maxRows);
   const askRows = asks.slice(0, maxRows);
   const rowCount = Math.max(bidRows.length, askRows.length, 1);
+  const myMarket = myMarkets?.markets[team];
+
+  const myBidIndex = bidRows.findIndex((level) => {
+    if (myMarket?.bid == null) return false;
+    if (!samePrice(level.price, myMarket.bid)) return false;
+    if (myMarket.bid_size != null && level.size === myMarket.bid_size) return true;
+    return true;
+  });
+
+  const myAskIndex = askRows.findIndex((level) => {
+    if (myMarket?.ask == null) return false;
+    if (!samePrice(level.price, myMarket.ask)) return false;
+    if (myMarket.ask_size != null && level.size === myMarket.ask_size) return true;
+    return true;
+  });
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
@@ -93,7 +137,12 @@ export function OrderBook({ team }: OrderBookProps) {
             </thead>
             <tbody>
               {bidRows.map((level, i) => (
-                <LevelRow key={i} level={level} side="bid" />
+                <LevelRow
+                  key={i}
+                  level={level}
+                  side="bid"
+                  isMine={i === myBidIndex}
+                />
               ))}
               {bidRows.length < rowCount &&
                 [...Array(rowCount - bidRows.length)].map((_, i) => (
@@ -118,7 +167,12 @@ export function OrderBook({ team }: OrderBookProps) {
             </thead>
             <tbody>
               {askRows.map((level, i) => (
-                <LevelRow key={i} level={level} side="ask" />
+                <LevelRow
+                  key={i}
+                  level={level}
+                  side="ask"
+                  isMine={i === myAskIndex}
+                />
               ))}
               {askRows.length < rowCount &&
                 [...Array(rowCount - askRows.length)].map((_, i) => (
@@ -131,6 +185,12 @@ export function OrderBook({ team }: OrderBookProps) {
           </table>
         </div>
       </div>
+
+      {(myBidIndex >= 0 || myAskIndex >= 0) && (
+        <div className="mt-3 text-xs text-gray-500 text-center">
+          Highlighted rows indicate your live quotes.
+        </div>
+      )}
     </div>
   );
 }
