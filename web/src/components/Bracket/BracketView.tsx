@@ -1520,13 +1520,18 @@ export function BracketView() {
   const hasWhatIfActive = permanentCount > 0 || scenarioCount > 0;
 
   return (
-    <div ref={containerRef} className="bg-white rounded-lg shadow p-6 overflow-x-auto">
+    <div
+      ref={containerRef}
+      data-testid="bracket-view"
+      className="bg-white rounded-lg shadow p-6 overflow-x-auto"
+    >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
           <h2 className="text-lg font-semibold text-gray-900">Tournament Bracket</h2>
           <select
             value={view}
             onChange={(e) => setView(e.target.value as BracketViewType)}
+            data-testid="bracket-view-select"
             className="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             {viewOptions.map((option) => (

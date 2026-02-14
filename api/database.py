@@ -1,12 +1,22 @@
 """SQLite database for persistent tournament data."""
 
+import os
 import sqlite3
 from pathlib import Path
 from contextlib import contextmanager
 from typing import Optional
 
-# Store database alongside the api package (project root)
-DATABASE_PATH = Path(__file__).resolve().parent.parent / "tourney.db"
+# Store database alongside the api package (project root) by default.
+# E2E tests can override this with TOURNEY_DB_PATH to isolate test state.
+DEFAULT_DATABASE_PATH = Path(__file__).resolve().parent.parent / "tourney.db"
+
+
+def get_database_path() -> Path:
+    """Get database path, with optional environment override."""
+    override = os.getenv("TOURNEY_DB_PATH")
+    if override:
+        return Path(override).expanduser().resolve()
+    return DEFAULT_DATABASE_PATH
 
 
 def init_db():
@@ -93,7 +103,9 @@ def init_db():
 @contextmanager
 def get_connection():
     """Get database connection with context manager."""
-    conn = sqlite3.connect(DATABASE_PATH)
+    db_path = get_database_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     try:
@@ -201,6 +213,14 @@ def get_active_scenario() -> Optional[dict]:
 def set_active_scenario(scenario_id: Optional[int]) -> bool:
     """Set the active scenario. Pass None for default (no scenario)."""
     with get_connection() as conn:
+        if scenario_id is not None:
+            exists = conn.execute(
+                "SELECT 1 FROM scenarios WHERE id = ?",
+                (scenario_id,),
+            ).fetchone()
+            if not exists:
+                return False
+
         conn.execute(
             "UPDATE active_scenario SET scenario_id = ? WHERE id = 1",
             (scenario_id,)

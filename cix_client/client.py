@@ -2,6 +2,8 @@ import os
 from collections import namedtuple
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from cix_client.exceptions import ApiException, BracketMismatchError
 from team_names import resolve_name
@@ -22,6 +24,19 @@ class CixClient:
             base_url or os.getenv("CIX_BASE_URL", "http://localhost:8000")
         ).rstrip("/")
         self._session = requests.Session()
+        self._timeout_seconds = float(os.getenv("CIX_TIMEOUT_SECONDS", "5.0"))
+        retries = Retry(
+            total=3,
+            connect=3,
+            read=3,
+            backoff_factor=0.25,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=frozenset(["POST"]),
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(max_retries=retries)
+        self._session.mount("http://", adapter)
+        self._session.mount("https://", adapter)
         self._bracket_teams = None
         self._bracket_validated = False
         self._validation_error = None
@@ -131,7 +146,11 @@ class CixClient:
 
         url = f"{self.base_url}/ncaa/api/{endpoint}"
         data = {"apid": self.apid, **params}
-        response = self._session.post(url, data=data)
+        response = self._session.post(
+            url,
+            data=data,
+            timeout=self._timeout_seconds,
+        )
         response.raise_for_status()
         body = response.json()
 

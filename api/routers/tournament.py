@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.models import TeamInfo, BracketResponse, BracketGame, PlayInGame, CompletedGame, ScoringConfig, BracketTreeResponse
-from api.services.tournament_service import TournamentService, get_tournament_service, apply_what_if, build_bracket_tree_response
+from api.services.tournament_service import TournamentService, get_tournament_service, build_bracket_tree_response
 from api.services.portfolio_service import PortfolioService, get_portfolio_service
 from api.utils import parse_what_if_params
 from api import database as db
@@ -24,9 +24,7 @@ def get_teams(
     try:
         # Apply what-if modifications if provided
         outcomes, adjustments = parse_what_if_params(what_if_outcomes, what_if_adjustments)
-        state = tournament.get_state()
-        if outcomes or adjustments:
-            state = apply_what_if(state, outcomes, adjustments, tournament.completed_games)
+        state = tournament.get_effective_state(outcomes, adjustments)
 
         # Calculate scores with the (possibly modified) state
         scores = state.calculate_scores_prob()
@@ -99,9 +97,7 @@ def get_bracket(
     try:
         # Apply what-if modifications if provided
         outcomes, adjustments = parse_what_if_params(what_if_outcomes, what_if_adjustments)
-        state = tournament.get_state()
-        if outcomes or adjustments:
-            state = apply_what_if(state, outcomes, adjustments, tournament.completed_games)
+        state = tournament.get_effective_state(outcomes, adjustments)
 
         # Get bracket structure from the modified state
         bracket = state.bracket
@@ -194,9 +190,7 @@ def get_bracket_tree(
     try:
         # Apply what-if modifications if provided
         outcomes, adjustments = parse_what_if_params(what_if_outcomes, what_if_adjustments)
-        state = tournament.get_state()
-        if outcomes or adjustments:
-            state = apply_what_if(state, outcomes, adjustments, tournament.completed_games)
+        state = tournament.get_effective_state(outcomes, adjustments)
 
         return build_bracket_tree_response(state, tournament.completed_games)
     except FileNotFoundError as e:

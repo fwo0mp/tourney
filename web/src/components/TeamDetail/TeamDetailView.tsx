@@ -150,6 +150,7 @@ export function TeamDetailView() {
             id="team-select"
             value={detailedViewTeam ?? ''}
             onChange={handleTeamChange}
+            data-testid="teamdetail-team-select"
             className="flex-1 max-w-md px-4 py-2 text-lg border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             disabled={teamsLoading}
           >
@@ -271,6 +272,7 @@ export function TeamDetailView() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleDirectionChange('buy')}
+                    data-testid="teamdetail-direction-buy"
                     className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg ${
                       hypotheticalTrade?.direction === 'buy'
                         ? 'bg-green-600 text-white'
@@ -281,6 +283,7 @@ export function TeamDetailView() {
                   </button>
                   <button
                     onClick={() => handleDirectionChange('sell')}
+                    data-testid="teamdetail-direction-sell"
                     className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg ${
                       hypotheticalTrade?.direction === 'sell'
                         ? 'bg-red-600 text-white'
@@ -302,6 +305,7 @@ export function TeamDetailView() {
                   value={hypotheticalTrade?.quantity ?? ''}
                   onChange={handleQuantityChange}
                   placeholder="0"
+                  data-testid="teamdetail-quantity-input"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -349,6 +353,7 @@ export function TeamDetailView() {
                     value={hypotheticalTrade?.price ?? ''}
                     onChange={handlePriceChange}
                     placeholder={fairValue.toFixed(2)}
+                    data-testid="teamdetail-price-input"
                     className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-right"
                   />
                 </div>
@@ -382,7 +387,7 @@ export function TeamDetailView() {
             {hypotheticalTrade && hypotheticalTrade.quantity > 0 ? (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-                  <div className="bg-gray-50 rounded-lg p-4">
+                  <div data-testid="teamdetail-position-change-card" className="bg-gray-50 rounded-lg p-4">
                     <div className="text-sm text-gray-500 mb-1">Position Change</div>
                     <div className={`text-2xl font-bold ${positionChange > 0 ? 'text-green-600' : positionChange < 0 ? 'text-red-600' : 'text-gray-400'}`}>
                       {currentPosition.toFixed(1)} → {hypotheticalPosition.toFixed(1)}
@@ -391,7 +396,7 @@ export function TeamDetailView() {
                       ({positionChange > 0 ? '+' : ''}{positionChange.toFixed(1)} shares)
                     </div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
+                  <div data-testid="teamdetail-ev-change-card" className="bg-gray-50 rounded-lg p-4">
                     <div className="text-sm text-gray-500 mb-1">EV Change</div>
                     {hypotheticalLoading ? (
                       <div className="text-2xl font-bold text-gray-400 animate-pulse">...</div>
@@ -417,7 +422,7 @@ export function TeamDetailView() {
                       {hypotheticalTrade.quantity} shares @ ${hypotheticalTrade.price.toFixed(2)}
                     </div>
                   </div>
-                  <div className="bg-blue-50 rounded-lg p-4 border-2 border-blue-200">
+                  <div data-testid="teamdetail-net-impact-card" className="bg-blue-50 rounded-lg p-4 border-2 border-blue-200">
                     <div className="text-sm text-blue-700 mb-1 font-medium">Net Impact</div>
                     {hypotheticalLoading ? (
                       <div className="text-2xl font-bold text-gray-400 animate-pulse">...</div>

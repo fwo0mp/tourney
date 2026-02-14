@@ -52,6 +52,16 @@ class TestCixClientConstruction:
             client = CixClient("test-apid", base_url="http://explicit:9000")
         assert client.base_url == "http://explicit:9000"
 
+    def test_default_timeout(self):
+        with patch.dict("os.environ", {}, clear=True):
+            client = CixClient("test-apid")
+        assert client._timeout_seconds == 5.0
+
+    def test_timeout_from_env(self):
+        with patch.dict("os.environ", {"CIX_TIMEOUT_SECONDS": "7.5"}):
+            client = CixClient("test-apid")
+        assert client._timeout_seconds == 7.5
+
 
 class TestPost:
     def _make_client(self):
@@ -95,6 +105,7 @@ class TestPost:
         mock_post.assert_called_once_with(
             "http://test:8000/ncaa/api/positions",
             data={"apid": "test-apid", "name": "full"},
+            timeout=5.0,
         )
 
     def test_http_error_raises(self):
@@ -267,7 +278,7 @@ class TestBracketValidation:
         mock_response = MagicMock()
 
         call_count = 0
-        def fake_post(url, data):
+        def fake_post(url, data, timeout=None):
             nonlocal call_count
             call_count += 1
             mock_resp = MagicMock()
@@ -291,7 +302,7 @@ class TestBracketValidation:
     def test_validation_fails_with_missing_teams(self):
         client = self._make_client(["Duke", "Gonzaga", "Baylor"])
 
-        def fake_post(url, data):
+        def fake_post(url, data, timeout=None):
             mock_resp = MagicMock()
             mock_resp.json.return_value = {
                 "success": True, "result": self.GAME_CONFIG,
@@ -307,7 +318,7 @@ class TestBracketValidation:
     def test_validation_blocks_subsequent_calls(self):
         client = self._make_client(["Duke", "Gonzaga"])
 
-        def fake_post(url, data):
+        def fake_post(url, data, timeout=None):
             mock_resp = MagicMock()
             mock_resp.json.return_value = {
                 "success": True, "result": self.GAME_CONFIG,
@@ -346,7 +357,7 @@ class TestBracketValidation:
     def test_set_bracket_teams_resets_validation(self):
         client = self._make_client(["Duke"])
 
-        def fake_post(url, data):
+        def fake_post(url, data, timeout=None):
             mock_resp = MagicMock()
             mock_resp.json.return_value = {
                 "success": True, "result": self.GAME_CONFIG,
@@ -381,7 +392,7 @@ class TestBracketValidation:
         client = self._make_client(["Connecticut", "N.C. State", "Michigan State"])
 
         call_count = 0
-        def fake_post(url, data):
+        def fake_post(url, data, timeout=None):
             nonlocal call_count
             call_count += 1
             mock_resp = MagicMock()
@@ -410,7 +421,7 @@ class TestBracketValidation:
         }
         client = self._make_client(["Connecticut"])
 
-        def fake_post(url, data):
+        def fake_post(url, data, timeout=None):
             mock_resp = MagicMock()
             mock_resp.json.return_value = {
                 "success": True, "result": game_config,
@@ -433,7 +444,7 @@ class TestBracketValidation:
         }
         client = self._make_client(["Connecticut"])
 
-        def fake_post(url, data):
+        def fake_post(url, data, timeout=None):
             mock_resp = MagicMock()
             mock_resp.json.return_value = {
                 "success": True, "result": game_config,

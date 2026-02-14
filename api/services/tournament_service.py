@@ -97,6 +97,26 @@ class TournamentService:
         self.ensure_loaded()
         return self.state
 
+    def get_effective_state(
+        self,
+        game_outcomes: list | None = None,
+        rating_adjustments: dict | None = None,
+    ) -> tourney.TournamentState:
+        """Get base state with optional what-if modifications applied safely.
+
+        Completed games are always respected, regardless of endpoint.
+        """
+        base_state = self.get_state()
+        if not game_outcomes and not rating_adjustments:
+            return base_state
+
+        return apply_what_if(
+            base_state,
+            game_outcomes=game_outcomes,
+            rating_adjustments=rating_adjustments,
+            completed_games=self.completed_games,
+        )
+
     def get_scores(self) -> dict:
         """Get expected scores for all teams."""
         self.ensure_loaded()
@@ -278,6 +298,17 @@ def compute_path_to_slot_with_rounds(
 
     if start_pos is None:
         return []  # Team not in bracket
+
+    if target_round < 0:
+        return []
+
+    if target_round >= len(rounds):
+        return []
+
+    # A team can only reach one deterministic slot per round based on its start slot.
+    expected_target_position = start_pos // (2 ** target_round)
+    if expected_target_position != target_position:
+        return []
 
     outcomes = []
     current_pos = start_pos
@@ -564,5 +595,4 @@ def build_bracket_tree_response(
         completed_games=completed,
         eliminated_teams=eliminated,
     )
-
 

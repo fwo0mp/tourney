@@ -26,7 +26,6 @@ from api.models import (
 from api.services.tournament_service import (
     TournamentService,
     get_tournament_service,
-    apply_what_if,
     compute_path_to_slot,
 )
 from api.services.portfolio_service import (
@@ -74,9 +73,7 @@ def get_game_importance(
     """Get importance scores for all upcoming determined games."""
     try:
         outcomes, adjustments = parse_what_if_params(what_if_outcomes, what_if_adjustments)
-        state = tournament.get_state()
-        if outcomes or adjustments:
-            state = apply_what_if(state, outcomes, adjustments)
+        state = tournament.get_effective_state(outcomes, adjustments)
 
         result = portfolio.get_all_game_importance(state=state)
         return GameImportanceResponse(
@@ -140,18 +137,11 @@ def analyze_what_if(
         original_scores = original_state.calculate_scores_prob()
         original_value = pv.get_portfolio_value(positions, original_scores)
 
-        # Apply modifications to create new state
-        modified_state = original_state
-
-        # Apply game outcome overrides with probability
-        for outcome in request.game_outcomes:
-            modified_state = modified_state.with_override(
-                outcome.team1, outcome.team2, outcome.probability
-            )
-
-        # Apply rating adjustments
-        for team_name, delta in request.rating_adjustments.items():
-            modified_state = modified_state.with_team_adjustment(team_name, delta)
+        # Apply modifications to create new state while respecting completed games.
+        modified_state = tournament.get_effective_state(
+            game_outcomes=request.game_outcomes,
+            rating_adjustments=request.rating_adjustments,
+        )
 
         # Calculate modified scores and value
         modified_scores = modified_state.calculate_scores_prob()
@@ -183,9 +173,7 @@ def get_slot_candidates(
     try:
         # Apply what-if state to tournament
         outcomes, adjustments = parse_what_if_params(what_if_outcomes, what_if_adjustments)
-        state = tournament.get_state()
-        if outcomes or adjustments:
-            state = apply_what_if(state, outcomes, adjustments)
+        state = tournament.get_effective_state(outcomes, adjustments)
 
         # Get candidates using the (possibly modified) state
         candidates = get_slot_candidates_with_deltas(
@@ -211,13 +199,13 @@ def compute_path(
     """Compute game outcomes needed for a team to reach a specific bracket slot."""
     try:
         # Apply existing outcomes to state
-        state = tournament.get_state()
+        outcomes = None
         if request.current_outcomes:
             outcomes = [
                 {"team1": o.team1, "team2": o.team2, "probability": o.probability}
                 for o in request.current_outcomes
             ]
-            state = apply_what_if(state, game_outcomes=outcomes)
+        state = tournament.get_effective_state(game_outcomes=outcomes)
 
         # Compute path - returns (winner, loser) tuples for definite outcomes
         path = compute_path_to_slot(state, request.team, request.round, request.position)
@@ -273,7 +261,9 @@ def get_active_scenario():
 @router.put("/scenarios/active")
 def set_active_scenario(request: SetActiveScenarioRequest):
     """Set the active scenario. Pass null scenario_id for default."""
-    db.set_active_scenario(request.scenario_id)
+    updated = db.set_active_scenario(request.scenario_id)
+    if not updated and request.scenario_id is not None:
+        raise HTTPException(status_code=404, detail="Scenario not found")
     return {"success": True}
 
 

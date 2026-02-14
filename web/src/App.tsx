@@ -33,7 +33,7 @@ function AppContent() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className={`max-w-7xl mx-auto px-4 py-4 transition-all duration-300 ${hasSidebar ? 'mr-96' : ''}`}>
-          <h1 className="text-xl font-semibold text-gray-900">
+          <h1 data-testid="app-title" className="text-xl font-semibold text-gray-900">
             Tournament Trading Dashboard
           </h1>
         </div>
