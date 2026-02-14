@@ -1,11 +1,10 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useBracket, useGameImportance, useTeams } from '../../hooks/useTournament';
 import { useUIStore } from '../../store/uiStore';
 import { MetaTeamModal } from './MetaTeamModal';
 import { RegionBracket } from './RegionBracket';
 import { Sweet16Bracket } from './Sweet16Bracket';
-import type { BracketGame, PlayInGame, TeamInfo } from '../../types';
-import type { BracketViewType } from './bracketConstants';
+import type { BracketGame, BracketViewType, PlayInGame, TeamInfo } from '../../types';
 import { getDeltaColor, getImportanceColor, makeGameKey } from './bracketUtils';
 
 interface RegionData {
@@ -60,12 +59,13 @@ function buildGameImportance(games: { team1: string; team2: string; adjusted_imp
 }
 
 export function BracketView() {
-  const [view, setView] = useState<BracketViewType>('overall');
   const { data: teams, isLoading: teamsLoading } = useTeams();
   const { data: bracket, isLoading: bracketLoading } = useBracket();
   const { data: importanceData } = useGameImportance();
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const view = useUIStore((state) => state.bracketView);
+  const setView = useUIStore((state) => state.setBracketView);
   const selectedTeam = useUIStore((state) => state.selectedTeam);
   const selectedGame = useUIStore((state) => state.selectedGame);
   const metaTeamModal = useUIStore((state) => state.metaTeamModal);

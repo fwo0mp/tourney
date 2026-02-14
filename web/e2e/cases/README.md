@@ -28,6 +28,7 @@ Each case in this directory is the source-of-truth definition for one Playwright
 ## Supported command types
 
 - `goto`
+- `reload`
 - `click`
 - `dblclick`
 - `fill`
