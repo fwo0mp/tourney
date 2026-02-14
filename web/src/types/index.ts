@@ -60,6 +60,13 @@ export interface GameDeltaResponse {
   adjusted_importance?: number;
 }
 
+export interface SelectedGame {
+  team1: string;
+  team2: string;
+  // True if both teams reached this matchup via completed games
+  bothConfirmedFromCompleted?: boolean;
+}
+
 export interface GameImportance {
   team1: string;
   team2: string;
@@ -181,6 +188,7 @@ export interface Scenario {
 
 // View modes for Dashboard tabs
 export type ViewMode = 'overview' | 'bracket' | 'whatif' | 'completed' | 'teamdetail';
+export type BracketViewType = 'overall' | 'region1' | 'region2' | 'region3' | 'region4' | 'sweet16';
 
 // Hypothetical trade for exploring potential trades
 export interface HypotheticalTrade {

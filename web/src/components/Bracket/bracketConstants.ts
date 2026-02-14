@@ -1,5 +1,3 @@
-export type BracketViewType = 'overall' | 'region1' | 'region2' | 'region3' | 'region4' | 'sweet16';
-
 // Default sizes for individual region views
 export const SLOT_WIDTH = 120;
 export const SLOT_HEIGHT = 24;
