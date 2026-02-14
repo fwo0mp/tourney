@@ -107,7 +107,7 @@ function FillComparisonPanel({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div className="bg-white rounded-lg shadow p-6" data-testid="teamdetail-fill-comparison">
       <h2 className="text-lg font-semibold text-gray-900 mb-1">Fill Scenario Comparison</h2>
       <p className="text-sm text-gray-500 mb-4">
         Compare full ask fill and full bid fill outcomes against current portfolio state.
@@ -126,9 +126,9 @@ function FillComparisonPanel({
           <tbody>
             <tr className="border-b border-gray-100">
               <td className="py-2 text-gray-700">Fill Assumption</td>
-              <td className="py-2 text-right text-red-700">{askFillDescription}</td>
+              <td className="py-2 text-right text-red-700" data-testid="teamdetail-fill-assumption-ask">{askFillDescription}</td>
               <td className="py-2 text-right text-gray-500">No fill</td>
-              <td className="py-2 text-right text-green-700">{bidFillDescription}</td>
+              <td className="py-2 text-right text-green-700" data-testid="teamdetail-fill-assumption-bid">{bidFillDescription}</td>
             </tr>
             <tr className="border-b border-gray-100">
               <td className="py-2 text-gray-700">Position (shares)</td>
@@ -144,23 +144,23 @@ function FillComparisonPanel({
             </tr>
             <tr className="border-b border-gray-100">
               <td className="py-2 text-gray-700">Portfolio EV</td>
-              <td className="py-2 text-right">
+              <td className="py-2 text-right" data-testid="teamdetail-fill-ev-ask">
                 {renderValue(askEV !== null ? askEV.toFixed(2) : null, askIsLoading, valueColor(askEV))}
               </td>
-              <td className="py-2 text-right">
+              <td className="py-2 text-right" data-testid="teamdetail-fill-ev-current">
                 {renderValue(currentEV !== null ? currentEV.toFixed(2) : null, askIsLoading && bidIsLoading, 'text-gray-700')}
               </td>
-              <td className="py-2 text-right">
+              <td className="py-2 text-right" data-testid="teamdetail-fill-ev-bid">
                 {renderValue(bidEV !== null ? bidEV.toFixed(2) : null, bidIsLoading, valueColor(bidEV))}
               </td>
             </tr>
             <tr className="border-b border-gray-100">
               <td className="py-2 text-gray-700">EV Change</td>
-              <td className="py-2 text-right">
+              <td className="py-2 text-right" data-testid="teamdetail-fill-evchange-ask">
                 {renderValue(askEVChange !== null ? signedNumber(askEVChange) : null, askIsLoading, valueColor(askEVChange))}
               </td>
               <td className="py-2 text-right text-gray-700">0.00</td>
-              <td className="py-2 text-right">
+              <td className="py-2 text-right" data-testid="teamdetail-fill-evchange-bid">
                 {renderValue(bidEVChange !== null ? signedNumber(bidEVChange) : null, bidIsLoading, valueColor(bidEVChange))}
               </td>
             </tr>
@@ -178,23 +178,23 @@ function FillComparisonPanel({
             </tr>
             <tr className="border-b border-gray-100">
               <td className="py-2 text-gray-700">Portfolio Total (EV + Cash)</td>
-              <td className="py-2 text-right">
+              <td className="py-2 text-right" data-testid="teamdetail-fill-total-ask">
                 {renderValue(askTotal !== null ? `$${askTotal.toFixed(2)}` : null, askIsLoading, valueColor(askNetImpact))}
               </td>
-              <td className="py-2 text-right">
+              <td className="py-2 text-right" data-testid="teamdetail-fill-total-current">
                 {renderValue(currentTotal !== null ? `$${currentTotal.toFixed(2)}` : null, askIsLoading && bidIsLoading, 'text-gray-700')}
               </td>
-              <td className="py-2 text-right">
+              <td className="py-2 text-right" data-testid="teamdetail-fill-total-bid">
                 {renderValue(bidTotal !== null ? `$${bidTotal.toFixed(2)}` : null, bidIsLoading, valueColor(bidNetImpact))}
               </td>
             </tr>
             <tr>
               <td className="py-2 text-gray-700 font-medium">Net Impact vs Current</td>
-              <td className="py-2 text-right font-medium">
+              <td className="py-2 text-right font-medium" data-testid="teamdetail-fill-net-ask">
                 {renderValue(askNetImpact !== null ? signedCurrency(askNetImpact) : null, askIsLoading, valueColor(askNetImpact))}
               </td>
               <td className="py-2 text-right text-gray-700 font-medium">$0.00</td>
-              <td className="py-2 text-right font-medium">
+              <td className="py-2 text-right font-medium" data-testid="teamdetail-fill-net-bid">
                 {renderValue(bidNetImpact !== null ? signedCurrency(bidNetImpact) : null, bidIsLoading, valueColor(bidNetImpact))}
               </td>
             </tr>
@@ -463,13 +463,13 @@ export function TeamDetailView() {
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Team Summary</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-gray-50 rounded-lg p-4">
-                <div className="text-2xl font-bold text-gray-900">
+                <div className="text-2xl font-bold text-gray-900" data-testid="teamdetail-team-ev">
                   {team.expected_score.toFixed(2)}
                 </div>
                 <div className="text-xs text-gray-500">Team EV</div>
               </div>
               <div className="bg-gray-50 rounded-lg p-4">
-                <div className={`text-2xl font-bold ${team.delta > 0 ? 'text-green-600' : team.delta < 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                <div className={`text-2xl font-bold ${team.delta > 0 ? 'text-green-600' : team.delta < 0 ? 'text-red-600' : 'text-gray-400'}`} data-testid="teamdetail-portfolio-delta">
                   {team.delta > 0 ? '+' : ''}{team.delta.toFixed(2)}
                 </div>
                 <div className="text-xs text-gray-500">Portfolio Delta</div>
@@ -527,8 +527,8 @@ export function TeamDetailView() {
               </div>
             </>
           ) : (
-            <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-gray-500">
+            <div className="bg-white rounded-lg shadow p-6" data-testid="teamdetail-fill-placeholder">
+              <p className="text-gray-500" data-testid="teamdetail-fill-placeholder-text">
                 Configure a valid market quote above to see bid-fill and ask-fill EV/risk impact.
               </p>
             </div>

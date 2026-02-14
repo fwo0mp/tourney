@@ -190,7 +190,7 @@ export function MarketMakerControls({ team, fairValue, maxPrice, onQuoteChange }
   const hasExisting = hasLiveSide(existing?.bid, existing?.bid_size) || hasLiveSide(existing?.ask, existing?.ask_size);
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div className="bg-white rounded-lg shadow p-6" data-testid="teamdetail-market-maker">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-900">Market Maker</h2>
         {myMarkets?.is_mock && (
@@ -208,6 +208,7 @@ export function MarketMakerControls({ team, fairValue, maxPrice, onQuoteChange }
               min={0}
               max={maxPrice}
               step={0.01}
+              data-testid="teamdetail-market-midpoint-slider"
               value={midpoint}
               onChange={(e) => handleMidpointChange(parseFloat(e.target.value))}
               className="flex-1"
@@ -217,6 +218,7 @@ export function MarketMakerControls({ team, fairValue, maxPrice, onQuoteChange }
               min={0}
               max={maxPrice}
               step={0.01}
+              data-testid="teamdetail-market-midpoint-input"
               value={midpoint.toFixed(2)}
               onChange={(e) => handleMidpointChange(parseFloat(e.target.value) || 0)}
               className="w-20 px-2 py-1 text-sm border border-gray-300 rounded text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -231,6 +233,7 @@ export function MarketMakerControls({ team, fairValue, maxPrice, onQuoteChange }
               min={0.5}
               max={20}
               step={0.1}
+              data-testid="teamdetail-market-spread-slider"
               value={spreadPct}
               onChange={(e) => handleSpreadChange(parseFloat(e.target.value))}
               className="flex-1"
@@ -240,6 +243,7 @@ export function MarketMakerControls({ team, fairValue, maxPrice, onQuoteChange }
               min={0.5}
               max={20}
               step={0.1}
+              data-testid="teamdetail-market-spread-input"
               value={spreadPct.toFixed(1)}
               onChange={(e) => handleSpreadChange(parseFloat(e.target.value) || 0.5)}
               className="w-20 px-2 py-1 text-sm border border-gray-300 rounded text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -257,6 +261,7 @@ export function MarketMakerControls({ team, fairValue, maxPrice, onQuoteChange }
             min={0}
             max={maxPrice}
             step={0.01}
+            data-testid="teamdetail-market-bid-input"
             value={bid}
             onChange={(e) => handleBidChange(parseFloat(e.target.value) || 0)}
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -269,6 +274,7 @@ export function MarketMakerControls({ team, fairValue, maxPrice, onQuoteChange }
             min={0}
             max={maxPrice}
             step={0.01}
+            data-testid="teamdetail-market-ask-input"
             value={ask}
             onChange={(e) => handleAskChange(parseFloat(e.target.value) || 0)}
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -284,6 +290,7 @@ export function MarketMakerControls({ team, fairValue, maxPrice, onQuoteChange }
             type="number"
             min={1}
             step={100}
+            data-testid="teamdetail-market-bid-size-input"
             value={bidSize}
             onChange={(e) => setBidSize(parseInt(e.target.value) || 1)}
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -295,6 +302,7 @@ export function MarketMakerControls({ team, fairValue, maxPrice, onQuoteChange }
             type="number"
             min={1}
             step={100}
+            data-testid="teamdetail-market-ask-size-input"
             value={askSize}
             onChange={(e) => setAskSize(parseInt(e.target.value) || 1)}
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -303,7 +311,7 @@ export function MarketMakerControls({ team, fairValue, maxPrice, onQuoteChange }
       </div>
 
       {/* Summary line */}
-      <div className="text-xs text-gray-500 mb-3 text-center">
+      <div className="text-xs text-gray-500 mb-3 text-center" data-testid="teamdetail-market-summary">
         {isValid ? (
           <>Quoting <span className="text-green-700 font-medium">{bid.toFixed(2)}</span> / <span className="text-red-700 font-medium">{ask.toFixed(2)}</span> ({(ask - bid).toFixed(2)} wide, {((ask - bid) / ((bid + ask) / 2) * 100).toFixed(1)}%)</>
         ) : (
@@ -315,6 +323,7 @@ export function MarketMakerControls({ team, fairValue, maxPrice, onQuoteChange }
       <button
         onClick={handleSubmit}
         disabled={!isValid || makeMarket.isPending}
+        data-testid="teamdetail-market-submit"
         className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {makeMarket.isPending ? 'Submitting...' : hasExisting ? 'Update Market' : 'Place Market'}

@@ -183,8 +183,8 @@ class CIXService:
             return {
                 "markets": {
                     "Duke": {"bid": 2.50, "bid_size": 5000, "ask": 2.65, "ask_size": 5000, "position": 100},
-                    "Houston": {"bid": 3.10, "bid_size": 3000, "ask": 3.30, "ask_size": 3000, "position": -50},
-                    "Auburn": {"bid": 4.00, "bid_size": 2000, "ask": 4.20, "ask_size": 2000, "position": 200},
+                    "Houston": {"bid": 3.10, "bid_size": 3000, "position": -50},
+                    "Auburn": {"ask": 4.20, "ask_size": 2000, "position": 200},
                 },
                 "is_mock": True,
             }

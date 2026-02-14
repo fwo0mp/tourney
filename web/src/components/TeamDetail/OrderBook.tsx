@@ -13,10 +13,12 @@ function LevelRow({
   level,
   side,
   isMine,
+  rowTestId,
 }: {
   level: OrderbookLevel;
   side: 'bid' | 'ask';
   isMine: boolean;
+  rowTestId?: string;
 }) {
   const isBid = side === 'bid';
   const mineRowClass = isBid
@@ -24,7 +26,10 @@ function LevelRow({
     : 'bg-red-50 border-red-100';
 
   return (
-    <tr className={`border-b ${isMine ? mineRowClass : 'border-gray-50'}`}>
+    <tr
+      className={`border-b ${isMine ? mineRowClass : 'border-gray-50'}`}
+      data-testid={rowTestId}
+    >
       {isBid ? (
         <>
           <td className={`py-1.5 px-2 text-xs text-left ${isMine ? 'text-green-700 font-semibold' : 'text-gray-500'}`}>
@@ -108,7 +113,7 @@ export function OrderBook({ team }: OrderBookProps) {
   });
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div className="bg-white rounded-lg shadow p-6" data-testid="teamdetail-orderbook">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-900">Order Book</h2>
         {orderbook?.is_mock && (
@@ -142,6 +147,7 @@ export function OrderBook({ team }: OrderBookProps) {
                   level={level}
                   side="bid"
                   isMine={i === myBidIndex}
+                  rowTestId={i === myBidIndex ? 'teamdetail-orderbook-my-bid' : undefined}
                 />
               ))}
               {bidRows.length < rowCount &&
@@ -172,6 +178,7 @@ export function OrderBook({ team }: OrderBookProps) {
                   level={level}
                   side="ask"
                   isMine={i === myAskIndex}
+                  rowTestId={i === myAskIndex ? 'teamdetail-orderbook-my-ask' : undefined}
                 />
               ))}
               {askRows.length < rowCount &&
