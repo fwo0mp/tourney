@@ -183,6 +183,9 @@ class _FailingCIX:
     def __init__(self, error):
         self._error = error
 
+    def get_executions(self, mine_only=True, since=None, n=None):
+        raise self._error
+
     def get_orderbook(self, team):
         raise self._error
 
@@ -191,6 +194,35 @@ class _FailingCIX:
 
     def cancel_order(self, order_id):
         raise self._error
+
+
+class _StubCIX:
+    def get_executions(self, mine_only=True, since=None, n=None):
+        return {
+            "executions": [
+                {
+                    "time": "2026-02-14T00:00:00+00:00",
+                    "team": "Duke",
+                    "side": "buy",
+                    "quantity": 3,
+                    "price": 2.5,
+                }
+            ],
+            "is_mock": False,
+        }
+
+
+def test_market_router_get_executions_success():
+    response = market_router.get_executions(
+        mine_only=True,
+        since=None,
+        n=100,
+        cix=_StubCIX(),
+    )
+
+    assert response.is_mock is False
+    assert len(response.executions) == 1
+    assert response.executions[0].team == "Duke"
 
 
 def test_market_router_maps_unavailable_to_503():
@@ -209,6 +241,18 @@ def test_market_router_maps_upstream_to_502():
             team="Duke",
             order=market_router.OrderRequest(side="buy", price=1.0, size=1),
             cix=_FailingCIX(CIXUpstreamError("upstream rejected order")),
+        )
+
+    assert exc_info.value.status_code == 502
+
+
+def test_market_router_executions_map_upstream_to_502():
+    with pytest.raises(HTTPException) as exc_info:
+        market_router.get_executions(
+            mine_only=True,
+            since=None,
+            n=100,
+            cix=_FailingCIX(CIXUpstreamError("upstream rejected executions request")),
         )
 
     assert exc_info.value.status_code == 502

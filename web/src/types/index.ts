@@ -113,6 +113,20 @@ export interface DeltasResponse {
   pairwise: Record<string, Record<string, number>>;
 }
 
+export interface ExecutionRecord {
+  time: string;
+  team: string;
+  side: string;
+  quantity: number;
+  price: number;
+}
+
+export interface ExecutionsResponse {
+  executions: ExecutionRecord[];
+  is_mock: boolean;
+  error?: string | null;
+}
+
 export interface WhatIfGameOutcome {
   team1: string;
   team2: string;

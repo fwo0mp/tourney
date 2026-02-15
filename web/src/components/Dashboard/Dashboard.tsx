@@ -1,4 +1,5 @@
 import { PortfolioSummary } from './PortfolioSummary';
+import { RecentTradesOverview } from './RecentTradesOverview';
 import { TeamsTable } from './TeamsTable';
 import { GameImportanceTable } from './GameImportanceTable';
 import { BracketView } from '../Bracket/BracketView';
@@ -77,6 +78,7 @@ export function Dashboard() {
 
       {viewMode === 'overview' && (
         <div className="space-y-6">
+          <RecentTradesOverview />
           <TeamsTable />
           <GameImportanceTable />
         </div>

@@ -1,6 +1,6 @@
-"""Market API endpoints for orderbook and order placement."""
+"""Market API endpoints for orderbook, orders, and execution history."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from api.services.cix_service import (
@@ -46,6 +46,50 @@ class OrderbookResponse(BaseModel):
     asks: list[OrderbookLevel]
     is_mock: bool = False
     error: str | None = None
+
+
+class ExecutionRecord(BaseModel):
+    """A single execution/trade event."""
+
+    time: str
+    team: str
+    side: str
+    quantity: float
+    price: float
+
+
+class ExecutionsResponse(BaseModel):
+    """Execution history response."""
+
+    executions: list[ExecutionRecord]
+    is_mock: bool = False
+    error: str | None = None
+
+
+@router.get("/executions", response_model=ExecutionsResponse)
+def get_executions(
+    mine_only: bool = Query(default=True),
+    since: str | None = Query(
+        default=None,
+        description="Optional lower-bound timestamp (ISO or YYYY-MM-DD HH:MM:SS).",
+    ),
+    n: int = Query(default=300, ge=1, le=2000),
+    cix: CIXService = Depends(get_cix_service),
+):
+    """Get recent execution history."""
+    try:
+        result = cix.get_executions(mine_only=mine_only, since=since, n=n)
+        return ExecutionsResponse(
+            executions=[ExecutionRecord(**e) for e in result.get("executions", [])],
+            is_mock=result.get("is_mock", True),
+            error=result.get("error"),
+        )
+    except CIXConfigurationError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except CIXUnavailableError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except CIXUpstreamError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 
 @router.get("/{team}/orderbook", response_model=OrderbookResponse)
