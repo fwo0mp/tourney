@@ -1,4 +1,4 @@
-# CASE-001: Dashboard, Bracket, Team Detail, Hypothetical Trade
+# CASE-001: Dashboard, Bracket, Team Detail, Market Maker
 
 ## Actions and expected outcomes
 
@@ -7,16 +7,16 @@
 2. Switch to Bracket view and select Sweet 16 layout.
    Expected: bracket container is visible and view selector updates.
 3. Switch to Team Detail and choose Duke.
-   Expected: team detail content renders for the selected team.
-4. Configure a hypothetical buy trade.
-   Expected: position/EV/net-impact cards render with trade context.
+   Expected: market maker and fill comparison content render for the selected team.
+4. Verify market-focused panels are present.
+   Expected: order book and market maker controls are visible.
 
 ## Machine Definition
 
 ```json
 {
   "id": "CASE-001",
-  "title": "Dashboard bracket team detail trade flow",
+  "title": "Dashboard bracket team detail market maker flow",
   "steps": [
     {
       "id": "Step-1",
@@ -42,25 +42,22 @@
     {
       "id": "Step-3",
       "action": "Open Team Detail tab and choose Duke",
-      "expected": "Team Detail content loads for Duke.",
+      "expected": "Team Detail market maker content loads for Duke.",
       "commands": [
         { "type": "click", "target": { "by": "testId", "value": "dashboard-tab-teamdetail" } },
         { "type": "expectVisible", "target": { "by": "testId", "value": "teamdetail-team-select" } },
         { "type": "select", "target": { "by": "testId", "value": "teamdetail-team-select" }, "optionValue": "Duke" },
-        { "type": "expectVisible", "target": { "by": "role", "role": "heading", "name": "Hypothetical Trade" } }
+        { "type": "expectVisible", "target": { "by": "role", "role": "heading", "name": "Fill Scenario Comparison" } }
       ]
     },
     {
       "id": "Step-4",
-      "action": "Set buy quantity and price for hypothetical trade",
-      "expected": "Impact cards are visible for position, EV change, and net impact.",
+      "action": "Verify order book and market maker controls are visible",
+      "expected": "Market controls and order book render on the Team Detail page.",
       "commands": [
-        { "type": "click", "target": { "by": "testId", "value": "teamdetail-direction-buy" } },
-        { "type": "fill", "target": { "by": "testId", "value": "teamdetail-quantity-input" }, "value": "5" },
-        { "type": "fill", "target": { "by": "testId", "value": "teamdetail-price-input" }, "value": "2.5" },
-        { "type": "expectVisible", "target": { "by": "testId", "value": "teamdetail-position-change-card" } },
-        { "type": "expectVisible", "target": { "by": "testId", "value": "teamdetail-ev-change-card" } },
-        { "type": "expectVisible", "target": { "by": "testId", "value": "teamdetail-net-impact-card" } }
+        { "type": "expectVisible", "target": { "by": "testId", "value": "teamdetail-orderbook" } },
+        { "type": "expectVisible", "target": { "by": "testId", "value": "teamdetail-market-maker" } },
+        { "type": "expectVisible", "target": { "by": "testId", "value": "teamdetail-fill-comparison" } }
       ]
     }
   ]

@@ -79,12 +79,18 @@ class CIXService:
             return {
                 "team": team,
                 "bids": [
-                    {"price": 2.50, "size": 10},
-                    {"price": 2.45, "size": 25},
+                    {"price": 2.50, "size": 5000, "entry": "you"},
+                    {"price": 2.45, "size": 2500, "entry": "shark42"},
+                    {"price": 2.40, "size": 3000, "entry": "bettor_x"},
+                    {"price": 2.35, "size": 1500, "entry": "market_mm"},
+                    {"price": 2.30, "size": 4000, "entry": "whale99"},
                 ],
                 "asks": [
-                    {"price": 2.60, "size": 15},
-                    {"price": 2.65, "size": 20},
+                    {"price": 2.60, "size": 3000, "entry": "shark42"},
+                    {"price": 2.65, "size": 4000, "entry": "you"},
+                    {"price": 2.70, "size": 2000, "entry": "bettor_x"},
+                    {"price": 2.75, "size": 5000, "entry": "market_mm"},
+                    {"price": 2.80, "size": 1000, "entry": "whale99"},
                 ],
                 "is_mock": True,
             }
@@ -92,10 +98,19 @@ class CIXService:
         try:
             client = self._get_client()
             orderbook = client.get_orderbook(team)
+            # CIX returns {price, quantity, entry} per level; map quantity→size
+            bids = [
+                {"price": b["price"], "size": b["quantity"], "entry": b.get("entry")}
+                for b in orderbook.get("bids", [])
+            ]
+            asks = [
+                {"price": a["price"], "size": a["quantity"], "entry": a.get("entry")}
+                for a in orderbook.get("asks", [])
+            ]
             return {
                 "team": team,
-                "bids": orderbook.get("bids", []),
-                "asks": orderbook.get("asks", []),
+                "bids": bids,
+                "asks": asks,
                 "is_mock": False,
             }
         except Exception as exc:
@@ -136,6 +151,55 @@ class CIXService:
             raise
         except Exception as exc:
             raise self._translate_client_error(exc, "place_order") from exc
+
+    def make_market(self, team: str, bid: float, bid_size: int, ask: float, ask_size: int) -> dict:
+        """Place or update a two-sided market (bid + ask) for a team."""
+        if self._use_mock:
+            return {
+                "success": True,
+                "team": team,
+                "bid": bid,
+                "bid_size": bid_size,
+                "ask": ask,
+                "ask_size": ask_size,
+                "is_mock": True,
+            }
+
+        client = self._get_client()
+        client.make_market(team, bid=bid, bid_size=bid_size, ask=ask, ask_size=ask_size)
+        return {
+            "success": True,
+            "team": team,
+            "bid": bid,
+            "bid_size": bid_size,
+            "ask": ask,
+            "ask_size": ask_size,
+            "is_mock": False,
+        }
+
+    def my_markets(self) -> dict:
+        """Get user's current market-making orders for all teams."""
+        if self._use_mock:
+            return {
+                "markets": {
+                    "Duke": {"bid": 2.50, "bid_size": 5000, "ask": 2.65, "ask_size": 5000, "position": 100},
+                    "Houston": {"bid": 3.10, "bid_size": 3000, "position": -50},
+                    "Auburn": {"ask": 4.20, "ask_size": 2000, "position": 200},
+                },
+                "is_mock": True,
+            }
+
+        client = self._get_client()
+        raw = client.my_markets()
+        # CIX returns abbreviations as keys; translate to canonical names
+        markets = {}
+        for abbrev_or_name, data in raw.items():
+            canonical = client.from_cix_name(abbrev_or_name)
+            markets[canonical] = data
+        return {
+            "markets": markets,
+            "is_mock": False,
+        }
 
     def cancel_order(self, order_id: str) -> dict:
         """Cancel an order."""

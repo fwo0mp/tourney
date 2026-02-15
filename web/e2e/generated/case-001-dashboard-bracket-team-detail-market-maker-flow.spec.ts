@@ -3,7 +3,7 @@
 
 import { test, expect } from '../fixtures/e2e';
 
-test("CASE-001: Dashboard bracket team detail trade flow", async ({ page }) => {
+test("CASE-001: Dashboard bracket team detail market maker flow", async ({ page }) => {
   // Source markdown: e2e/cases/CASE-001-dashboard-bracket-teamdetail-trade.md
 
   // CASE-001 Step-1: Open dashboard root page
@@ -20,19 +20,16 @@ test("CASE-001: Dashboard bracket team detail trade flow", async ({ page }) => {
   await expect(page.getByTestId("bracket-view-select")).toHaveValue("sweet16");
 
   // CASE-001 Step-3: Open Team Detail tab and choose Duke
-  // Expected: Team Detail content loads for Duke.
+  // Expected: Team Detail market maker content loads for Duke.
   await page.getByTestId("dashboard-tab-teamdetail").click();
   await expect(page.getByTestId("teamdetail-team-select")).toBeVisible();
   await page.getByTestId("teamdetail-team-select").selectOption("Duke");
-  await expect(page.getByRole("heading", { name: "Hypothetical Trade" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Fill Scenario Comparison" })).toBeVisible();
 
-  // CASE-001 Step-4: Set buy quantity and price for hypothetical trade
-  // Expected: Impact cards are visible for position, EV change, and net impact.
-  await page.getByTestId("teamdetail-direction-buy").click();
-  await page.getByTestId("teamdetail-quantity-input").fill("5");
-  await page.getByTestId("teamdetail-price-input").fill("2.5");
-  await expect(page.getByTestId("teamdetail-position-change-card")).toBeVisible();
-  await expect(page.getByTestId("teamdetail-ev-change-card")).toBeVisible();
-  await expect(page.getByTestId("teamdetail-net-impact-card")).toBeVisible();
+  // CASE-001 Step-4: Verify order book and market maker controls are visible
+  // Expected: Market controls and order book render on the Team Detail page.
+  await expect(page.getByTestId("teamdetail-orderbook")).toBeVisible();
+  await expect(page.getByTestId("teamdetail-market-maker")).toBeVisible();
+  await expect(page.getByTestId("teamdetail-fill-comparison")).toBeVisible();
 
 });

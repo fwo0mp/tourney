@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import type {
   BracketViewType,
-  HypotheticalTrade,
   Scenario,
   SelectedGame,
   ViewMode,
@@ -31,8 +30,6 @@ interface UIState {
   bracketView: BracketViewType;
   // Team selected for detailed view (separate from sidebar selectedTeam)
   detailedViewTeam: string | null;
-  // Hypothetical trade for exploration (not persisted)
-  hypotheticalTrade: HypotheticalTrade | null;
 
   // Actions
   selectTeam: (team: string | null) => void;
@@ -62,10 +59,6 @@ interface UIState {
   // Detailed view actions
   setDetailedViewTeam: (team: string | null) => void;
   navigateToDetailedView: (team: string) => void;
-  // Hypothetical trade actions
-  setHypotheticalTrade: (trade: HypotheticalTrade | null) => void;
-  updateHypotheticalTrade: (updates: Partial<HypotheticalTrade>) => void;
-  clearHypotheticalTrade: () => void;
 }
 
 const emptyWhatIfState: WhatIfState = {
@@ -105,7 +98,6 @@ export const useUIStore = create<UIState>((set, get) => ({
   viewMode: initialNavigationState.viewMode,
   bracketView: initialNavigationState.bracketView,
   detailedViewTeam: initialNavigationState.detailedViewTeam,
-  hypotheticalTrade: null,
 
   selectTeam: (team) => set({ selectedTeam: team, selectedGame: null }),
 
@@ -423,16 +415,4 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   navigateToDetailedView: (team) =>
     set({ viewMode: 'teamdetail', detailedViewTeam: team, selectedTeam: null, selectedGame: null }),
-
-  // Hypothetical trade actions
-  setHypotheticalTrade: (trade) => set({ hypotheticalTrade: trade }),
-
-  updateHypotheticalTrade: (updates) =>
-    set((state) => ({
-      hypotheticalTrade: state.hypotheticalTrade
-        ? { ...state.hypotheticalTrade, ...updates }
-        : null,
-    })),
-
-  clearHypotheticalTrade: () => set({ hypotheticalTrade: null }),
 }));
