@@ -1,12 +1,14 @@
 import { create } from 'zustand';
-import type { WhatIfGameOutcome, WhatIfState, ViewMode, Scenario } from '../types';
+import type {
+  BracketViewType,
+  Scenario,
+  SelectedGame,
+  ViewMode,
+  WhatIfGameOutcome,
+  WhatIfState,
+} from '../types';
 import { analysisApi } from '../api/analysis';
-
-interface SelectedGame {
-  team1: string;
-  team2: string;
-  bothConfirmedFromCompleted?: boolean;  // True if both teams reached this matchup via completed games
-}
+import { parseNavigationStateFromSearch } from '../utils/navigationUrlState';
 
 interface MetaTeamModal {
   nodeId: string;
@@ -24,6 +26,8 @@ interface UIState {
   monteCarloStale: boolean;
   // View mode for Dashboard tabs (moved from Dashboard local state)
   viewMode: ViewMode;
+  // Sub-view for bracket tab
+  bracketView: BracketViewType;
   // Team selected for detailed view (separate from sidebar selectedTeam)
   detailedViewTeam: string | null;
 
@@ -51,6 +55,7 @@ interface UIState {
   clearMonteCarloStale: () => void;
   // View mode actions
   setViewMode: (mode: ViewMode) => void;
+  setBracketView: (mode: BracketViewType) => void;
   // Detailed view actions
   setDetailedViewTeam: (team: string | null) => void;
   navigateToDetailedView: (team: string) => void;
@@ -76,9 +81,13 @@ async function refetchWhatIfState(set: (partial: Partial<UIState>) => void) {
   }
 }
 
+const initialNavigationState = typeof window === 'undefined'
+  ? parseNavigationStateFromSearch('')
+  : parseNavigationStateFromSearch(window.location.search);
+
 export const useUIStore = create<UIState>((set, get) => ({
-  selectedTeam: null,
-  selectedGame: null,
+  selectedTeam: initialNavigationState.selectedTeam,
+  selectedGame: initialNavigationState.selectedGame,
   bracketZoom: 1,
   whatIf: emptyWhatIfState,
   whatIfLoaded: false,
@@ -86,8 +95,9 @@ export const useUIStore = create<UIState>((set, get) => ({
   scenariosLoaded: false,
   metaTeamModal: null,
   monteCarloStale: false,
-  viewMode: 'overview',
-  detailedViewTeam: null,
+  viewMode: initialNavigationState.viewMode,
+  bracketView: initialNavigationState.bracketView,
+  detailedViewTeam: initialNavigationState.detailedViewTeam,
 
   selectTeam: (team) => set({ selectedTeam: team, selectedGame: null }),
 
@@ -398,6 +408,7 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   // View mode actions
   setViewMode: (mode) => set({ viewMode: mode }),
+  setBracketView: (mode) => set({ bracketView: mode }),
 
   // Detailed view actions
   setDetailedViewTeam: (team) => set({ detailedViewTeam: team }),

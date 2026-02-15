@@ -87,10 +87,13 @@ export function TeamPanel({ teamName }: TeamPanelProps) {
     });
 
   return (
-    <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-xl border-l border-gray-200 overflow-y-auto">
+    <div
+      data-testid="team-panel"
+      className="fixed inset-y-0 right-0 w-96 bg-white shadow-xl border-l border-gray-200 overflow-y-auto"
+    >
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-gray-900">{teamName}</h2>
+          <h2 data-testid="team-panel-team-name" className="text-xl font-bold text-gray-900">{teamName}</h2>
           <div className="flex items-center gap-2">
             <button
               onClick={() => navigateToDetailedView(teamName)}

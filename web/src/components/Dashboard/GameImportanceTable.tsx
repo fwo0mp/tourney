@@ -66,7 +66,7 @@ export function GameImportanceTable() {
         </span>
       </div>
       <div className="overflow-auto flex-1">
-        <table className="min-w-full">
+        <table data-testid="game-importance-table" className="min-w-full">
           <thead className="sticky top-0 bg-white">
             <tr className="border-b border-gray-200">
               <SortHeader label="Matchup" column="matchup" currentColumn={sortColumn} sortMode={sortMode} onSort={handleSort} align="left" />
@@ -82,6 +82,7 @@ export function GameImportanceTable() {
             {sorted.map((game: GameImportance) => (
               <tr
                 key={`${game.team1}-${game.team2}`}
+                data-testid="game-importance-row"
                 className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
                 onClick={() => selectGame({ team1: game.team1, team2: game.team2, bothConfirmedFromCompleted: true })}
               >

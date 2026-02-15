@@ -77,6 +77,8 @@ function renderCommand(command) {
   switch (command.type) {
     case 'goto':
       return `await page.goto(${quote(command.path)});`;
+    case 'reload':
+      return `await page.reload();`;
     case 'click':
       return `await ${renderLocator(command.target)}.click();`;
     case 'dblclick':

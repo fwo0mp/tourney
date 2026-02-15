@@ -65,7 +65,10 @@ export function GamePanel({ team1, team2 }: GamePanelProps) {
     });
 
   return (
-    <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-xl border-l border-gray-200 overflow-y-auto">
+    <div
+      data-testid="game-panel"
+      className="fixed inset-y-0 right-0 w-96 bg-white shadow-xl border-l border-gray-200 overflow-y-auto"
+    >
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold text-gray-900">Game Analysis</h2>
@@ -92,6 +95,7 @@ export function GamePanel({ team1, team2 }: GamePanelProps) {
               <div className="flex items-center justify-center gap-3">
                 <button
                   onClick={() => selectTeam(team1)}
+                  data-testid="game-panel-team1-button"
                   className="text-lg font-semibold text-blue-600 hover:underline"
                 >
                   {team1}
@@ -99,6 +103,7 @@ export function GamePanel({ team1, team2 }: GamePanelProps) {
                 <span className="text-gray-400">vs</span>
                 <button
                   onClick={() => selectTeam(team2)}
+                  data-testid="game-panel-team2-button"
                   className="text-lg font-semibold text-blue-600 hover:underline"
                 >
                   {team2}
