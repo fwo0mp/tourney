@@ -458,81 +458,102 @@ export function TeamDetailView() {
         </div>
       ) : team ? (
         <>
-          {/* Top summary focused on EV + delta */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Team Summary</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="text-2xl font-bold text-gray-900" data-testid="teamdetail-team-ev">
-                  {team.expected_score.toFixed(2)}
-                </div>
-                <div className="text-xs text-gray-500">Team EV</div>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className={`text-2xl font-bold ${team.delta > 0 ? 'text-green-600' : team.delta < 0 ? 'text-red-600' : 'text-gray-400'}`} data-testid="teamdetail-portfolio-delta">
-                  {team.delta > 0 ? '+' : ''}{team.delta.toFixed(2)}
-                </div>
-                <div className="text-xs text-gray-500">Portfolio Delta</div>
-                <p className="text-xs text-gray-400 mt-1">
-                  Portfolio value change per +1 point rating adjustment
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Market-focused controls */}
+          {/* Top row: team summary + full order book */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Team Summary</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="text-2xl font-bold text-gray-900" data-testid="teamdetail-team-ev">
+                    {team.expected_score.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-gray-500">Team EV</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className={`text-2xl font-bold ${team.delta > 0 ? 'text-green-600' : team.delta < 0 ? 'text-red-600' : 'text-gray-400'}`} data-testid="teamdetail-portfolio-delta">
+                    {team.delta > 0 ? '+' : ''}{team.delta.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-gray-500">Portfolio Delta</div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Portfolio value change per +1 point rating adjustment
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div
+                    className={`text-2xl font-bold ${currentPosition > 0 ? 'text-green-600' : currentPosition < 0 ? 'text-red-600' : 'text-gray-400'}`}
+                    data-testid="teamdetail-current-position"
+                  >
+                    {currentPosition !== 0 ? (currentPosition > 0 ? '+' : '') + currentPosition.toFixed(1) : '-'}
+                  </div>
+                  <div className="text-xs text-gray-500">Current Position</div>
+                </div>
+              </div>
+            </div>
             <OrderBook team={detailedViewTeam} />
-            <MarketMakerControls
-              team={detailedViewTeam}
-              fairValue={fairValue}
-              maxPrice={maxPrice}
-              onQuoteChange={setMarketQuote}
-            />
           </div>
 
-          {isValidQuote ? (
-            <>
-              {/* Fill impact comparison */}
-              <FillComparisonPanel
-                bidPrice={bidPrice}
-                bidSize={bidSize}
-                askPrice={askPrice}
-                askSize={askSize}
-                currentPosition={currentPosition}
-                bidHypotheticalPortfolio={bidHypotheticalPortfolio}
-                askHypotheticalPortfolio={askHypotheticalPortfolio}
-                bidIsLoading={bidHypotheticalLoading}
-                askIsLoading={askHypotheticalLoading}
-              />
-
-              {/* Per-team delta risk for each fill side */}
+          {/* Collapsible market-maker workspace */}
+          <details className="bg-white rounded-lg shadow p-6" open>
+            <summary className="cursor-pointer text-lg font-semibold text-gray-900">
+              Market Maker
+            </summary>
+            <div className="mt-4 space-y-6">
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                <DeltaRiskTable
-                  title="Bid Fill Delta Risk"
-                  subtitle={`How team deltas change if your bid fully fills (+${bidSize.toLocaleString()} shares).`}
-                  rows={sortedBidDeltaChanges}
-                  sortColumn={deltaRiskSortColumn}
-                  sortMode={deltaRiskSortMode}
-                  onSort={handleDeltaRiskSort}
+                <MarketMakerControls
+                  team={detailedViewTeam}
+                  fairValue={fairValue}
+                  maxPrice={maxPrice}
+                  onQuoteChange={setMarketQuote}
                 />
-                <DeltaRiskTable
-                  title="Ask Fill Delta Risk"
-                  subtitle={`How team deltas change if your ask fully fills (-${askSize.toLocaleString()} shares).`}
-                  rows={sortedAskDeltaChanges}
-                  sortColumn={deltaRiskSortColumn}
-                  sortMode={deltaRiskSortMode}
-                  onSort={handleDeltaRiskSort}
-                />
+
+                {isValidQuote ? (
+                  <FillComparisonPanel
+                    bidPrice={bidPrice}
+                    bidSize={bidSize}
+                    askPrice={askPrice}
+                    askSize={askSize}
+                    currentPosition={currentPosition}
+                    bidHypotheticalPortfolio={bidHypotheticalPortfolio}
+                    askHypotheticalPortfolio={askHypotheticalPortfolio}
+                    bidIsLoading={bidHypotheticalLoading}
+                    askIsLoading={askHypotheticalLoading}
+                  />
+                ) : (
+                  <div className="bg-white rounded-lg border border-gray-200 p-6" data-testid="teamdetail-fill-placeholder">
+                    <p className="text-gray-500" data-testid="teamdetail-fill-placeholder-text">
+                      Configure a valid market quote above to see bid-fill and ask-fill EV/risk impact.
+                    </p>
+                  </div>
+                )}
               </div>
-            </>
-          ) : (
-            <div className="bg-white rounded-lg shadow p-6" data-testid="teamdetail-fill-placeholder">
-              <p className="text-gray-500" data-testid="teamdetail-fill-placeholder-text">
-                Configure a valid market quote above to see bid-fill and ask-fill EV/risk impact.
-              </p>
+
+              {/* Team delta hypotheticals */}
+              {isValidQuote ? (
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  <DeltaRiskTable
+                    title="Bid Fill Delta Risk"
+                    subtitle={`How team deltas change if your bid fully fills (+${bidSize.toLocaleString()} shares).`}
+                    rows={sortedBidDeltaChanges}
+                    sortColumn={deltaRiskSortColumn}
+                    sortMode={deltaRiskSortMode}
+                    onSort={handleDeltaRiskSort}
+                  />
+                  <DeltaRiskTable
+                    title="Ask Fill Delta Risk"
+                    subtitle={`How team deltas change if your ask fully fills (-${askSize.toLocaleString()} shares).`}
+                    rows={sortedAskDeltaChanges}
+                    sortColumn={deltaRiskSortColumn}
+                    sortMode={deltaRiskSortMode}
+                    onSort={handleDeltaRiskSort}
+                  />
+                </div>
+              ) : (
+                <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-500">
+                  Team delta hypotheticals appear once the market quote is valid.
+                </div>
+              )}
             </div>
-          )}
+          </details>
 
           {/* Delta Breakdown (reused from TeamPanel) */}
           {impact && impact.breakdown.length > 0 && (
@@ -589,13 +610,7 @@ export function TeamDetailView() {
               Additional Team Stats
             </summary>
             <div className="mt-4 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className={`text-2xl font-bold ${currentPosition > 0 ? 'text-green-600' : currentPosition < 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                    {currentPosition !== 0 ? (currentPosition > 0 ? '+' : '') + currentPosition.toFixed(1) : '-'}
-                  </div>
-                  <div className="text-xs text-gray-500">Current Position</div>
-                </div>
+              <div className="grid grid-cols-1 gap-4">
                 {orderbook && (orderbook.bids.length > 0 || orderbook.asks.length > 0) && (
                   <div className="bg-gray-50 rounded-lg p-4">
                     <div className="flex justify-between items-center">
