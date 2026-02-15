@@ -48,6 +48,50 @@ class OrderbookResponse(BaseModel):
     error: str | None = None
 
 
+class MarketOverviewQuote(BaseModel):
+    """Top-of-book quote for one side with ownership."""
+
+    price: float
+    size: int
+    is_mine: bool
+
+
+class MarketOverviewEntry(BaseModel):
+    """Top-of-book quote snapshot for one team."""
+
+    team: str
+    bid: MarketOverviewQuote | None = None
+    ask: MarketOverviewQuote | None = None
+
+
+class MarketOverviewResponse(BaseModel):
+    """Top-of-book market summary for all teams."""
+
+    markets: list[MarketOverviewEntry]
+    is_mock: bool = False
+    error: str | None = None
+
+
+@router.get("/overview", response_model=MarketOverviewResponse)
+def get_market_overview(
+    cix: CIXService = Depends(get_cix_service),
+):
+    """Get top-of-book market summary with quote ownership flags."""
+    try:
+        result = cix.get_market_overview()
+        return MarketOverviewResponse(
+            markets=[MarketOverviewEntry(**m) for m in result.get("markets", [])],
+            is_mock=result.get("is_mock", True),
+            error=result.get("error"),
+        )
+    except CIXConfigurationError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except CIXUnavailableError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except CIXUpstreamError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
 @router.get("/{team}/orderbook", response_model=OrderbookResponse)
 def get_orderbook(
     team: str,

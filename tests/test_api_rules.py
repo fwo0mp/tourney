@@ -183,6 +183,9 @@ class _FailingCIX:
     def __init__(self, error):
         self._error = error
 
+    def get_market_overview(self):
+        raise self._error
+
     def get_orderbook(self, team):
         raise self._error
 
@@ -197,6 +200,15 @@ def test_market_router_maps_unavailable_to_503():
     with pytest.raises(HTTPException) as exc_info:
         market_router.get_orderbook(
             team="Duke",
+            cix=_FailingCIX(CIXUnavailableError("network down")),
+        )
+
+    assert exc_info.value.status_code == 503
+
+
+def test_market_overview_router_maps_unavailable_to_503():
+    with pytest.raises(HTTPException) as exc_info:
+        market_router.get_market_overview(
             cix=_FailingCIX(CIXUnavailableError("network down")),
         )
 

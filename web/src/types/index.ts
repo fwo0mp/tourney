@@ -218,6 +218,25 @@ export interface PortfolioValueResponse {
   total_value: number;
 }
 
+// Response from /market/overview endpoint
+export interface MarketOverviewQuote {
+  price: number;
+  size: number;
+  is_mine: boolean;
+}
+
+export interface MarketOverviewEntry {
+  team: string;
+  bid: MarketOverviewQuote | null;
+  ask: MarketOverviewQuote | null;
+}
+
+export interface MarketOverviewResponse {
+  markets: MarketOverviewEntry[];
+  is_mock: boolean;
+  error?: string | null;
+}
+
 // Scoring configuration from /tournament/scoring
 export interface ScoringConfig {
   round_points: number[];  // Points per round
