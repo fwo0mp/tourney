@@ -5,7 +5,11 @@ import type { TeamInfo } from '../../types';
 
 type SortColumn = 'name' | 'position' | 'ev' | 'value' | 'delta';
 
-export function TeamsTable() {
+interface TeamsTableProps {
+  compact?: boolean;
+}
+
+export function TeamsTable({ compact = false }: TeamsTableProps) {
   const { data: teams, isLoading } = useTeams();
   const selectTeam = useUIStore((state) => state.selectTeam);
   const navigateToDetailedView = useUIStore((state) => state.navigateToDetailedView);
@@ -13,8 +17,10 @@ export function TeamsTable() {
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Teams</h2>
+      <div className={compact ? 'space-y-3' : 'bg-white rounded-lg shadow p-6'}>
+        <h3 className={compact ? 'text-sm font-semibold text-gray-900' : 'text-lg font-semibold text-gray-900 mb-4'}>
+          Teams
+        </h3>
         <div className="animate-pulse space-y-2">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="h-8 bg-gray-200 rounded"></div>
@@ -43,14 +49,16 @@ export function TeamsTable() {
   });
 
   return (
-    <div className="bg-white rounded-lg shadow p-6 flex flex-col h-[500px]">
-      <div className="flex items-center justify-between mb-4 flex-shrink-0">
-        <h2 className="text-lg font-semibold text-gray-900">Teams</h2>
+    <div className={compact ? 'space-y-3' : 'bg-white rounded-lg shadow p-6 flex flex-col h-[500px]'}>
+      <div className={`flex items-center justify-between ${compact ? '' : 'mb-4 flex-shrink-0'}`}>
+        <h3 className={compact ? 'text-sm font-semibold text-gray-900' : 'text-lg font-semibold text-gray-900'}>
+          Teams
+        </h3>
         <span className="text-xs text-gray-500">
           {teamsWithActivity.length} teams with positions or exposure
         </span>
       </div>
-      <div className="overflow-auto flex-1">
+      <div className={compact ? 'overflow-auto' : 'overflow-auto flex-1'}>
         <table className="min-w-full">
           <thead className="sticky top-0 bg-white">
             <tr className="border-b border-gray-200">

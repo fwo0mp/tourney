@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { useTeams } from '../../hooks/useTournament';
 import { useMarketOverview } from '../../hooks/useMarket';
 import { useUIStore } from '../../store/uiStore';
+import { TeamsTable } from './TeamsTable';
+import { SortHeader, StaticHeader, sortData, useSortState } from '../common';
 
 type CrossingSide = 'bid' | 'ask';
 
@@ -32,12 +34,21 @@ interface MarketsTableProps {
   onNavigateToDetail: (team: string) => void;
 }
 
+type MarketsSortColumn = 'team' | 'ev' | 'bid' | 'ask' | 'crossing_amount';
+
 function formatPrice(value: number | null): string {
   return value === null ? '-' : value.toFixed(2);
 }
 
 function formatSize(value: number | null): string {
   return value === null ? '-' : value.toString();
+}
+
+function getCrossingAmountPercent(row: CrossingRow & { orders: CrossingOrder[] }): number {
+  if (row.ev <= 0) {
+    return 0;
+  }
+  return Math.max(...row.orders.map((order) => order.edge / row.ev), 0);
 }
 
 function MarketsTable({
@@ -47,31 +58,50 @@ function MarketsTable({
   onSelectTeam,
   onNavigateToDetail,
 }: MarketsTableProps) {
+  const { sortColumn, sortMode, handleSort } = useSortState<MarketsSortColumn>('crossing_amount', 'desc');
+
+  const sortedRows = useMemo(
+    () =>
+      sortData(rows, sortColumn, sortMode, (row, column) => {
+        switch (column) {
+          case 'team': return row.team;
+          case 'ev': return row.ev;
+          case 'bid': return row.bid ?? 0;
+          case 'ask': return row.ask ?? 0;
+          case 'crossing_amount': return getCrossingAmountPercent(row);
+          default: return 0;
+        }
+      }),
+    [rows, sortColumn, sortMode],
+  );
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-        <span className="text-xs text-gray-500">{rows.length} teams</span>
+        <span className="text-xs text-gray-500">{sortedRows.length} teams</span>
       </div>
 
-      {rows.length === 0 ? (
+      {sortedRows.length === 0 ? (
         <p className="text-sm text-gray-500">{emptyMessage}</p>
       ) : (
         <div className="overflow-auto">
           <table className="min-w-full">
             <thead className="sticky top-0 bg-white">
               <tr className="border-b border-gray-200">
-                <th className="text-left py-2 text-xs font-medium text-gray-500">Team</th>
-                <th className="text-right py-2 text-xs font-medium text-gray-500">EV</th>
-                <th className="text-right py-2 text-xs font-medium text-gray-500">Best Bid</th>
-                <th className="text-right py-2 text-xs font-medium text-gray-500">Best Ask</th>
-                <th className="text-right py-2 text-xs font-medium text-gray-500">Crossing Orders</th>
+                <SortHeader label="Team" column="team" currentColumn={sortColumn} sortMode={sortMode} onSort={handleSort} align="left" />
+                <SortHeader label="EV" column="ev" currentColumn={sortColumn} sortMode={sortMode} onSort={handleSort} />
+                <SortHeader label="Best Bid" column="bid" currentColumn={sortColumn} sortMode={sortMode} onSort={handleSort} />
+                <SortHeader label="Best Ask" column="ask" currentColumn={sortColumn} sortMode={sortMode} onSort={handleSort} />
+                <SortHeader label="Crossing Amount" column="crossing_amount" currentColumn={sortColumn} sortMode={sortMode} onSort={handleSort} />
+                <StaticHeader label="Crossing Orders" />
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => {
+              {sortedRows.map((row) => {
                 const hasBidCrossing = row.orders.some((order) => order.side === 'bid');
                 const hasAskCrossing = row.orders.some((order) => order.side === 'ask');
+                const crossingAmountPct = getCrossingAmountPercent(row);
 
                 return (
                   <tr
@@ -90,6 +120,9 @@ function MarketsTable({
                     </td>
                     <td className={`py-2 text-sm text-right ${hasAskCrossing ? 'text-green-600 font-medium' : 'text-gray-600'}`}>
                       {formatPrice(row.ask)} <span className="text-xs text-gray-400">({formatSize(row.askSize)})</span>
+                    </td>
+                    <td className="py-2 text-sm text-right font-medium text-blue-600">
+                      {(crossingAmountPct * 100).toFixed(1)}%
                     </td>
                     <td className="py-2 text-sm">
                       <div className="flex flex-wrap justify-end gap-1">
@@ -264,6 +297,7 @@ export function MarketsOfInterest() {
               />
             </>
           )}
+          <TeamsTable compact />
         </div>
       )}
     </div>

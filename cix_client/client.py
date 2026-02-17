@@ -79,7 +79,11 @@ class CixClient:
 
         config = self.game_config()
         # game_config returns teams as {abbrev: full_name}
-        server_team_names = set(config["teams"].values())
+        teams_map = config["teams"]
+        server_team_names = set(teams_map.values())
+        abbreviations_by_full_name = {}
+        for abbrev, full_name in teams_map.items():
+            abbreviations_by_full_name.setdefault(full_name, []).append(abbrev)
 
         missing = []
         for team in self._bracket_teams:
@@ -87,6 +91,9 @@ class CixClient:
                 cix_name = resolve_name(team, server_team_names)
                 self._to_cix[team] = cix_name
                 self._from_cix[cix_name] = team
+                for abbrev in abbreviations_by_full_name.get(cix_name, []):
+                    # market_data/open orders frequently use abbreviations.
+                    self._from_cix[abbrev] = team
             except KeyError:
                 missing.append(team)
 

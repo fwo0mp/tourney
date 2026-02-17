@@ -455,6 +455,8 @@ class TestBracketValidation:
             client._validate_bracket()
 
         assert client.from_cix_name("UConn") == "Connecticut"
+        # market_data often returns abbreviations; these should map too
+        assert client.from_cix_name("CONN") == "Connecticut"
         assert client.from_cix_name("Unknown Team") == "Unknown Team"
 
     def test_outgoing_methods_translate_names(self):
