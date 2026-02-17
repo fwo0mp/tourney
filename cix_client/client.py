@@ -81,19 +81,16 @@ class CixClient:
         # game_config returns teams as {abbrev: full_name}
         teams_map = config["teams"]
         server_team_names = set(teams_map.values())
-        abbreviations_by_full_name = {}
-        for abbrev, full_name in teams_map.items():
-            abbreviations_by_full_name.setdefault(full_name, []).append(abbrev)
+        full_to_abbrev = {full: abbrev for abbrev, full in teams_map.items()}
 
         missing = []
         for team in self._bracket_teams:
             try:
-                cix_name = resolve_name(team, server_team_names)
-                self._to_cix[team] = cix_name
-                self._from_cix[cix_name] = team
-                for abbrev in abbreviations_by_full_name.get(cix_name, []):
-                    # market_data/open orders frequently use abbreviations.
-                    self._from_cix[abbrev] = team
+                cix_full = resolve_name(team, server_team_names)
+                abbrev = full_to_abbrev[cix_full]
+                self._to_cix[team] = abbrev
+                self._from_cix[cix_full] = team
+                self._from_cix[abbrev] = team
             except KeyError:
                 missing.append(team)
 
@@ -118,11 +115,11 @@ class CixClient:
         self._bracket_validated = True
 
     def to_cix_name(self, name):
-        """Translate a canonical/bracket name to the CIX server name."""
+        """Translate a canonical/bracket name to the CIX abbreviation (symbol)."""
         return self._to_cix.get(name, name)
 
     def from_cix_name(self, name):
-        """Translate a CIX server name to the canonical/bracket name."""
+        """Translate a CIX name (abbreviation or full) to the canonical/bracket name."""
         return self._from_cix.get(name, name)
 
     def _post(self, endpoint, **params):
@@ -218,6 +215,9 @@ class CixClient:
     def get_orderbook(self, team, depth=5):
         """Get order book for a team.
 
+        Tries the get_book endpoint first (full depth). If it fails,
+        falls back to market_data which provides top-of-book only.
+
         Args:
             team: Team name/identifier.
             depth: Number of price levels (default 5).
@@ -226,11 +226,25 @@ class CixClient:
             dict with 'bids' and 'asks' lists. Each entry has
             'price', 'quantity', 'entry' keys.
         """
-        result = self._post("get_book", team=str(self.to_cix_name(team)), depth=str(depth))
-        if result:
-            result["bids"] = list(result.get("bids", []))
-            result["asks"] = list(result.get("asks", []))
-        return result
+        abbrev = str(self.to_cix_name(team))
+        try:
+            result = self._post("get_book", team=abbrev, depth=str(depth))
+            if result:
+                result["bids"] = list(result.get("bids", []))
+                result["asks"] = list(result.get("asks", []))
+            return result
+        except Exception:
+            # get_book may fail (server-side serialization bug);
+            # fall back to market_data for top-of-book
+            all_data = self._post("market_data")
+            team_data = all_data.get(abbrev, {})
+            bids = []
+            asks = []
+            if team_data.get("bid") is not None:
+                bids = [{"price": team_data["bid"], "quantity": team_data.get("bid_size", 0)}]
+            if team_data.get("ask") is not None:
+                asks = [{"price": team_data["ask"], "quantity": team_data.get("ask_size", 0)}]
+            return {"bids": bids, "asks": asks}
 
     # --- Order Placement ---
 

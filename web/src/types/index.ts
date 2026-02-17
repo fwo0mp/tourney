@@ -190,14 +190,6 @@ export interface Scenario {
 export type ViewMode = 'overview' | 'bracket' | 'whatif' | 'completed' | 'teamdetail';
 export type BracketViewType = 'overall' | 'region1' | 'region2' | 'region3' | 'region4' | 'sweet16';
 
-// Hypothetical trade for exploring potential trades
-export interface HypotheticalTrade {
-  team: string;
-  direction: 'buy' | 'sell';
-  quantity: number;
-  price: number;
-}
-
 // Response from hypothetical value calculation
 export interface HypotheticalValueResponse {
   current_value: number;
@@ -242,6 +234,62 @@ export interface ScoringConfig {
   round_points: number[];  // Points per round
   max_score: number;  // Maximum possible score (sum of round points)
   num_rounds: number;
+}
+
+// Market data types
+
+export interface OrderbookLevel {
+  price: number;
+  size: number;
+  entry: string | null;
+}
+
+export interface OrderbookResponse {
+  team: string;
+  bids: OrderbookLevel[];
+  asks: OrderbookLevel[];
+  is_mock: boolean;
+  error: string | null;
+}
+
+export interface MakeMarketRequest {
+  bid: number;
+  bid_size: number;
+  ask: number;
+  ask_size: number;
+}
+
+export interface MakeMarketResponse {
+  success: boolean;
+  team: string;
+  bid: number;
+  bid_size: number;
+  ask: number;
+  ask_size: number;
+  is_mock: boolean;
+  error: string | null;
+}
+
+export interface MyMarketEntry {
+  bid: number | null;
+  bid_size: number | null;
+  ask: number | null;
+  ask_size: number | null;
+  position: number | null;
+}
+
+export interface MyMarketsResponse {
+  markets: Record<string, MyMarketEntry>;
+  is_mock: boolean;
+}
+
+// Editable market-maker quote state used by Team Detail UI
+export interface MarketMakerQuoteState {
+  bid: number;
+  ask: number;
+  bidSize: number;
+  askSize: number;
+  isValid: boolean;
 }
 
 // Tree-based bracket types

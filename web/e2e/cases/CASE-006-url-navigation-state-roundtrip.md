@@ -93,12 +93,12 @@
       "commands": [
         { "type": "click", "target": { "by": "role", "role": "button", "name": "View Details" } },
         { "type": "expectVisible", "target": { "by": "testId", "value": "teamdetail-team-select" } },
-        { "type": "expectVisible", "target": { "by": "role", "role": "heading", "name": "Hypothetical Trade" } },
+        { "type": "expectVisible", "target": { "by": "testId", "value": "teamdetail-market-maker" } },
         { "type": "expectUrlContains", "value": "[?&]view=teamdetail(?:&|$)" },
         { "type": "expectUrlContains", "value": "[?&]detailTeam=[^&]+(?:&|$)" },
         { "type": "reload" },
         { "type": "expectVisible", "target": { "by": "testId", "value": "teamdetail-team-select" } },
-        { "type": "expectVisible", "target": { "by": "role", "role": "heading", "name": "Hypothetical Trade" } },
+        { "type": "expectVisible", "target": { "by": "testId", "value": "teamdetail-market-maker" } },
         { "type": "expectUrlContains", "value": "[?&]view=teamdetail(?:&|$)" },
         { "type": "expectUrlContains", "value": "[?&]detailTeam=[^&]+(?:&|$)" }
       ]

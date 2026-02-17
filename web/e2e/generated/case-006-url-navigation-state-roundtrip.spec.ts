@@ -62,12 +62,12 @@ test("CASE-006: URL navigation state roundtrip", async ({ page }) => {
   // Expected: URL stores teamdetail tab and selected detail team, and reload keeps the same team detail view.
   await page.getByRole("button", { name: "View Details" }).click();
   await expect(page.getByTestId("teamdetail-team-select")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Hypothetical Trade" })).toBeVisible();
+  await expect(page.getByTestId("teamdetail-market-maker")).toBeVisible();
   await expect(page).toHaveURL(new RegExp("[?&]view=teamdetail(?:&|$)"));
   await expect(page).toHaveURL(new RegExp("[?&]detailTeam=[^&]+(?:&|$)"));
   await page.reload();
   await expect(page.getByTestId("teamdetail-team-select")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Hypothetical Trade" })).toBeVisible();
+  await expect(page.getByTestId("teamdetail-market-maker")).toBeVisible();
   await expect(page).toHaveURL(new RegExp("[?&]view=teamdetail(?:&|$)"));
   await expect(page).toHaveURL(new RegExp("[?&]detailTeam=[^&]+(?:&|$)"));
 
