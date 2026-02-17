@@ -1,5 +1,6 @@
 import { api } from './client';
 import type {
+  MarketOverviewResponse,
   OrderbookResponse,
   MakeMarketRequest,
   MakeMarketResponse,
@@ -7,6 +8,8 @@ import type {
 } from '../types';
 
 export const marketApi = {
+  getOverview: () => api.get<MarketOverviewResponse>('/market/overview'),
+
   getOrderbook: (team: string) =>
     api.get<OrderbookResponse>(`/market/${encodeURIComponent(team)}/orderbook`),
 

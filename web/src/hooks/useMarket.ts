@@ -2,6 +2,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { marketApi } from '../api/market';
 import type { MakeMarketRequest } from '../types';
 
+export function useMarketOverview() {
+  return useQuery({
+    queryKey: ['market', 'overview'],
+    queryFn: marketApi.getOverview,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+}
+
 export function useOrderbook(team: string | null) {
   return useQuery({
     queryKey: ['market', 'orderbook', team],

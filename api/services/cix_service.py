@@ -1,7 +1,7 @@
 """CIX client service for market operations."""
 
 import os
-from typing import Optional
+from typing import Any, Optional
 
 import requests
 
@@ -73,6 +73,46 @@ class CIXService:
             return exc
         return CIXUpstreamError(f"CIX {operation} failed: {exc}")
 
+    @staticmethod
+    def _to_float(value: Any) -> float | None:
+        """Convert arbitrary numeric input to float, preserving None."""
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _to_int(value: Any) -> int | None:
+        """Convert arbitrary numeric input to int, preserving None."""
+        if value is None:
+            return None
+        try:
+            return int(float(value))
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _same_price(price_a: float | None, price_b: float | None) -> bool:
+        """Compare two prices with a tiny tolerance for float conversion noise."""
+        if price_a is None or price_b is None:
+            return False
+        return abs(price_a - price_b) < 1e-9
+
+    @staticmethod
+    def _quote_or_none(
+        price: float | None, size: int | None, is_mine: bool
+    ) -> dict[str, Any] | None:
+        """Build a quote payload only when price+size are both present."""
+        if price is None or size is None:
+            return None
+        return {
+            "price": price,
+            "size": size,
+            "is_mine": is_mine,
+        }
+
     def get_orderbook(self, team: str) -> dict:
         """Get current orderbook for a team."""
         if self._use_mock:
@@ -115,6 +155,79 @@ class CIXService:
             }
         except Exception as exc:
             raise self._translate_client_error(exc, "get_orderbook") from exc
+
+    def get_market_overview(self) -> dict:
+        """Get top-of-book market data and ownership of best quotes for all teams."""
+        if self._use_mock:
+            return {
+                "markets": [
+                    {
+                        "team": "Duke",
+                        "bid": {"price": 2.50, "size": 10, "is_mine": False},
+                        "ask": {"price": 2.60, "size": 15, "is_mine": True},
+                    },
+                    {
+                        "team": "Kansas",
+                        "bid": {"price": 2.20, "size": 8, "is_mine": True},
+                        "ask": {"price": 2.35, "size": 12, "is_mine": False},
+                    },
+                ],
+                "is_mock": True,
+            }
+
+        try:
+            client = self._get_client()
+            market_data_raw = client.market_data() or {}
+            my_markets_raw = client.my_markets() or {}
+
+            market_data = {
+                client.from_cix_name(team): data
+                for team, data in market_data_raw.items()
+            }
+            my_markets = {
+                client.from_cix_name(team): data
+                for team, data in my_markets_raw.items()
+            }
+
+            teams = sorted(set(market_data.keys()) | set(my_markets.keys()))
+            markets: list[dict[str, Any]] = []
+
+            for team in teams:
+                top = market_data.get(team)
+                mine = my_markets.get(team)
+
+                top_map = top if isinstance(top, dict) else {}
+                mine_map = mine if isinstance(mine, dict) else {}
+
+                bid = self._to_float(top_map.get("bid"))
+                ask = self._to_float(top_map.get("ask"))
+                bid_size = self._to_int(top_map.get("bid_size"))
+                ask_size = self._to_int(top_map.get("ask_size"))
+                my_bid = self._to_float(mine_map.get("bid"))
+                my_ask = self._to_float(mine_map.get("ask"))
+
+                markets.append(
+                    {
+                        "team": team,
+                        "bid": self._quote_or_none(
+                            bid,
+                            bid_size,
+                            self._same_price(bid, my_bid),
+                        ),
+                        "ask": self._quote_or_none(
+                            ask,
+                            ask_size,
+                            self._same_price(ask, my_ask),
+                        ),
+                    }
+                )
+
+            return {
+                "markets": markets,
+                "is_mock": False,
+            }
+        except Exception as exc:
+            raise self._translate_client_error(exc, "get_market_overview") from exc
 
     def place_order(self, team: str, side: str, price: float, size: int) -> dict:
         """Place an order."""

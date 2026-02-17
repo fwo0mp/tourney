@@ -79,8 +79,9 @@ class CixClient:
 
         config = self.game_config()
         # game_config returns teams as {abbrev: full_name}
-        server_team_names = set(config["teams"].values())
-        full_to_abbrev = {full: abbrev for abbrev, full in config["teams"].items()}
+        teams_map = config["teams"]
+        server_team_names = set(teams_map.values())
+        full_to_abbrev = {full: abbrev for abbrev, full in teams_map.items()}
 
         missing = []
         for team in self._bracket_teams:
